@@ -28,3 +28,37 @@ func TestRegisterAndCreateNotifier(t *testing.T) {
 		t.Error("Notify not called")
 	}
 }
+
+func TestSMTPNotifier(t *testing.T) {
+	props := map[string]string{
+		"smtp_user": "user@example.com",
+		"smtp_pass": "password",
+		"to":        "recipient@example.com",
+	}
+	n := NewSMTPNotifier(props)
+	if n == nil {
+		t.Fatal("SMTPNotifier not created")
+	}
+	err := n.Notify("Test Subject", "Test Message")
+	// We expect an error because credentials/server are fake, but it should be a proper error
+	if err == nil {
+		t.Error("Expected error for invalid SMTP config, got nil")
+	}
+}
+
+func TestTelegramNotifier(t *testing.T) {
+	props := map[string]string{
+		"bot_token": "123456:fake-token",
+		"chat_id":   "123456789",
+	}
+	n := NewTelegramNotifier(props)
+	if n == nil {
+		t.Log("TelegramNotifier could not be created with fake credentials, skipping Notify test.")
+		return
+	}
+	err := n.Notify("Test Subject", "Test Message")
+	// We expect an error because credentials are fake, but it should be a proper error
+	if err == nil {
+		t.Error("Expected error for invalid Telegram config, got nil")
+	}
+}

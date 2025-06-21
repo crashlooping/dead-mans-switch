@@ -16,7 +16,10 @@ func (t *TelegramNotifier) Notify(subject, message string) error {
 }
 
 func NewTelegramNotifier(props map[string]string) Notifier {
-	tg, _ := notifyTelegram.New(props["bot_token"])
+	tg, err := notifyTelegram.New(props["bot_token"])
+	if tg == nil || err != nil {
+		return nil
+	}
 	if chatIDStr, ok := props["chat_id"]; ok {
 		if chatID, err := strconv.ParseInt(chatIDStr, 10, 64); err == nil {
 			tg.AddReceivers(chatID)
