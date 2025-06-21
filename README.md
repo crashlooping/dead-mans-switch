@@ -74,6 +74,7 @@ This will start the service, mount your config and data, and expose port 8080.
 ### 3. Web Frontend
 
 Visit [http://localhost:8080/](http://localhost:8080/) in your browser to view:
+
 - A live-updating table of all device heartbeats and status
 - A list of all configured notification channels (with sensitive fields masked)
 - A link to the GitHub repository

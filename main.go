@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +21,8 @@ var (
 	lastHeartbeat time.Time
 	dbInstance    *db.DB
 	clientState   = make(map[string]bool) // true = missing, false = ok
+	sseClients    = make(map[chan string]struct{})
+	sseMu         sync.Mutex
 )
 
 func monitor(cfg *config.Config, notifiers []notify.Notifier) {
@@ -40,12 +44,14 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 					n.Notify("Dead Man's Switch Triggered", msg)
 				}
 				dbInstance.SetMissing(name, true)
+				broadcastDeviceTable() // update SSE clients on timeout
 			} else if !missed && ch.Missing {
 				msg := "Heartbeat received again from client: " + name
 				for _, n := range notifiers {
 					n.Notify("Dead Man's Switch Recovery", msg)
 				}
 				dbInstance.SetMissing(name, false)
+				broadcastDeviceTable() // update SSE clients on recovery
 			}
 		}
 	}
@@ -60,6 +66,42 @@ func setupNotifiers(cfg *config.Config) []notify.Notifier {
 		}
 	}
 	return result
+}
+
+func broadcastDeviceTable() {
+	heartbeats, err := dbInstance.GetAllHeartbeats()
+	if err != nil {
+		return
+	}
+	// Sort device names
+	var names []string
+	for name := range heartbeats {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>Missing</th></tr></thead><tbody>`
+	for _, name := range names {
+		ch := heartbeats[name]
+		html += "<tr>"
+		html += "<td>" + name + "</td>"
+		html += "<td>" + ch.Timestamp.Format("2006-01-02 15:04:05") + "</td>"
+		if ch.Missing {
+			html += "<td style='color:red'>Yes</td>"
+		} else {
+			html += "<td style='color:green'>No</td>"
+		}
+		html += "</tr>"
+	}
+	html += "</tbody></table>"
+
+	sseMu.Lock()
+	for ch := range sseClients {
+		select {
+		case ch <- html:
+		default:
+		}
+	}
+	sseMu.Unlock()
 }
 
 func main() {
@@ -87,6 +129,54 @@ func main() {
 }
 
 func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
+	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		ch := make(chan string, 10)
+		sseMu.Lock()
+		sseClients[ch] = struct{}{}
+		sseMu.Unlock()
+		defer func() {
+			sseMu.Lock()
+			delete(sseClients, ch)
+			sseMu.Unlock()
+			close(ch)
+		}()
+		// Send initial table
+		heartbeats, _ := dbInstance.GetAllHeartbeats()
+		var names []string
+		for name := range heartbeats {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>Missing</th></tr></thead><tbody>`
+		for _, name := range names {
+			chb := heartbeats[name]
+			html += "<tr>"
+			html += "<td>" + name + "</td>"
+			html += "<td>" + chb.Timestamp.Format("2006-01-02 15:04:05") + "</td>"
+			if chb.Missing {
+				html += "<td style='color:red'>Yes</td>"
+			} else {
+				html += "<td style='color:green'>No</td>"
+			}
+			html += "</tr>"
+		}
+		html += "</tbody></table>"
+		fmt.Fprintf(w, "data: %s\n\n", html)
+		w.(http.Flusher).Flush()
+		for {
+			select {
+			case msg := <-ch:
+				fmt.Fprintf(w, "data: %s\n\n", msg)
+				w.(http.Flusher).Flush()
+			case <-r.Context().Done():
+				return
+			}
+		}
+	})
+
 	http.HandleFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -115,6 +205,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			log.Printf("DB update error for %s: %v", body.Name, err)
 		} else {
 			log.Printf("Stored to DB: {name: %s, timestamp: %s}", body.Name, now.Format(time.RFC3339))
+			broadcastDeviceTable()
 		}
 		if wasMissing {
 			msg := "Heartbeat received again from client: " + body.Name
@@ -150,27 +241,8 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	})
 
 	http.HandleFunc("/web/devices", func(w http.ResponseWriter, r *http.Request) {
-		heartbeats, err := dbInstance.GetAllHeartbeats()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("DB error"))
-			return
-		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<table>
-			<thead><tr><th>Device</th><th>Last Seen</th><th>Missing</th></tr></thead><tbody>`))
-		for name, ch := range heartbeats {
-			w.Write([]byte("<tr>"))
-			w.Write([]byte("<td>" + name + "</td>"))
-			w.Write([]byte("<td>" + ch.Timestamp.Format("2006-01-02 15:04:05") + "</td>"))
-			if ch.Missing {
-				w.Write([]byte("<td style='color:red'>Yes</td>"))
-			} else {
-				w.Write([]byte("<td style='color:green'>No</td>"))
-			}
-			w.Write([]byte("</tr>"))
-		}
-		w.Write([]byte("</tbody></table>"))
+		w.Write([]byte(`<div id='device-table'></div>`)) // placeholder, SSE will update
 	})
 
 	http.HandleFunc("/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {

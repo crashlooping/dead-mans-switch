@@ -8,10 +8,13 @@
 </head>
 <body>
     <h1>Device Heartbeats</h1>
-    <div id="device-table" hx-get="/web/devices" hx-trigger="load, every 10s" hx-swap="outerHTML">
-        Loading device data...
-    </div>
-
+    <div id="device-table">Loading device data...</div>
+    <script>
+    const evtSource = new EventSource('/events');
+    evtSource.onmessage = function(e) {
+        document.getElementById('device-table').innerHTML = e.data;
+    };
+    </script>
     <h2>Configured Notifications</h2>
     <div id="notification-list" hx-get="/web/configured-notifications" hx-trigger="load" hx-swap="outerHTML">
         Loading notification channels...
