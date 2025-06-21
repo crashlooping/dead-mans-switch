@@ -61,6 +61,45 @@ docker build -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
 docker run -v $(pwd)/config.yaml:/app/config.yaml -p 8080:8080 ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
 ```
 
+#### Docker (plain)
+
+To run with plain Docker (no Compose):
+
+1. Build or pull the image (replace with your desired version/tag):
+
+```sh
+docker pull ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
+```
+
+1. Make sure you have a `config.yaml` in your current directory. Example config is shown above.
+
+1. (Recommended) Create a persistent data directory for BoltDB:
+
+```sh
+mkdir -p ./data
+```
+
+1. Run the container, mounting your config and data directories, and exposing port 8080:
+
+```sh
+docker run -d \
+  --name dead-mans-switch \
+  -v $(pwd)/config.yaml:/app/config.yaml:ro \
+  -v $(pwd)/data:/app/data \
+  -p 8080:8080 \
+  ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
+```
+
+- The `-v $(pwd)/config.yaml:/app/config.yaml:ro` mounts your config file read-only into the container.
+- The `-v $(pwd)/data:/app/data` mounts a persistent data directory for BoltDB storage.
+- The `-p 8080:8080` exposes the web UI and API on port 8080.
+
+You can stop and remove the container with:
+
+```sh
+docker stop dead-mans-switch && docker rm dead-mans-switch
+```
+
 #### Docker Compose
 
 A sample [`docker-compose.yaml`](docker-compose.yaml) is provided for easy deployment:
