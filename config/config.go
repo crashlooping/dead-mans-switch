@@ -27,10 +27,16 @@ func LoadConfig(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err == nil {
 		defer file.Close()
-		yaml.NewDecoder(file).Decode(cfg)
+		if err := yaml.NewDecoder(file).Decode(cfg); err != nil {
+			// Log or handle YAML decode error
+			return nil, err
+		}
 	}
 	// ENV overrides
-	envconfig.Process("", cfg)
+	if err := envconfig.Process("", cfg); err != nil {
+		// Log or handle envconfig error
+		return nil, err
+	}
 	return cfg, nil
 }
 

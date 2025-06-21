@@ -6,12 +6,14 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	os.WriteFile("test.yaml", []byte(`listen_addr: ":1234"
+	if err := os.WriteFile("test.yaml", []byte(`listen_addr: ":1234"
 timeout_seconds: 5
 notification_channels:
   - type: dummy
     to: "a@b.com"
-`), 0644)
+`), 0644); err != nil {
+		t.Fatalf("failed to write test.yaml: %v", err)
+	}
 	cfg, err := LoadConfig("test.yaml")
 	if err != nil {
 		t.Fatalf("failed to load: %v", err)

@@ -18,11 +18,10 @@ import (
 )
 
 var (
-	lastHeartbeat time.Time
-	dbInstance    *db.DB
-	clientState   = make(map[string]bool) // true = missing, false = ok
-	sseClients    = make(map[chan string]struct{})
-	sseMu         sync.Mutex
+	dbInstance  *db.DB
+	clientState = make(map[string]bool) // true = missing, false = ok
+	sseClients  = make(map[chan string]struct{})
+	sseMu       sync.Mutex
 )
 
 func monitor(cfg *config.Config, notifiers []notify.Notifier) {
@@ -41,16 +40,24 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 			if missed && !ch.Missing {
 				msg := "No heartbeat received in time from client: " + name + ". Last update was " + durStr + " ago."
 				for _, n := range notifiers {
-					n.Notify("Dead Man's Switch Triggered", msg)
+					if err := n.Notify("Dead Man's Switch Triggered", msg); err != nil {
+						log.Printf("Notify error: %v", err)
+					}
 				}
-				dbInstance.SetMissing(name, true)
+				if err := dbInstance.SetMissing(name, true); err != nil {
+					log.Printf("SetMissing error: %v", err)
+				}
 				broadcastDeviceTable() // update SSE clients on timeout
 			} else if !missed && ch.Missing {
 				msg := "Heartbeat received again from client: " + name
 				for _, n := range notifiers {
-					n.Notify("Dead Man's Switch Recovery", msg)
+					if err := n.Notify("Dead Man's Switch Recovery", msg); err != nil {
+						log.Printf("Notify error: %v", err)
+					}
 				}
-				dbInstance.SetMissing(name, false)
+				if err := dbInstance.SetMissing(name, false); err != nil {
+					log.Printf("SetMissing error: %v", err)
+				}
 				broadcastDeviceTable() // update SSE clients on recovery
 			}
 		}
@@ -122,7 +129,6 @@ func main() {
 		log.Fatalf("Failed to open DB: %v", err)
 	}
 	defer dbInstance.Close()
-	lastHeartbeat = time.Now()
 	notifiers := setupNotifiers(cfg)
 	go monitor(cfg, notifiers)
 	os.Exit(runServer(cfg, notifiers))
@@ -189,7 +195,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil || body.Name == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Missing or invalid 'name' in body"))
+			_, _ = w.Write([]byte("Missing or invalid 'name' in body"))
 			return
 		}
 		log.Printf("Received heartbeat from client: %s", body.Name)
@@ -210,14 +216,17 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		if wasMissing {
 			msg := "Heartbeat received again from client: " + body.Name
 			for _, n := range notifiers {
-				n.Notify("Dead Man's Switch Recovery", msg)
+				if err := n.Notify("Dead Man's Switch Recovery", msg); err != nil {
+					log.Printf("Notify error: %v", err)
+				}
 			}
-			dbInstance.SetMissing(body.Name, false)
+			if err := dbInstance.SetMissing(body.Name, false); err != nil {
+				log.Printf("SetMissing error: %v", err)
+			}
 		}
-		lastHeartbeat = now
 		clientState[body.Name] = false // mark as healthy on any heartbeat
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	http.HandleFunc("/heartbeats", func(w http.ResponseWriter, r *http.Request) {
@@ -228,11 +237,13 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		heartbeats, err := dbInstance.GetAllHeartbeats()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("DB error"))
+			_, _ = w.Write([]byte("DB error"))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(heartbeats)
+		if err := json.NewEncoder(w).Encode(heartbeats); err != nil {
+			log.Printf("Encode error: %v", err)
+		}
 	})
 
 	// Web frontend: serve static index.html
@@ -242,28 +253,28 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 
 	http.HandleFunc("/web/devices", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<div id='device-table'></div>`)) // placeholder, SSE will update
+		_, _ = w.Write([]byte(`<div id='device-table'></div>`)) // placeholder, SSE will update
 	})
 
 	http.HandleFunc("/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<ul>`))
+		_, _ = w.Write([]byte(`<ul>`))
 		for _, ch := range cfg.NotificationChannels {
-			w.Write([]byte("<li><b>" + ch.Type + "</b>"))
+			_, _ = w.Write([]byte("<li><b>" + ch.Type + "</b>"))
 			if len(ch.Properties) > 0 {
-				w.Write([]byte(": <code>"))
+				_, _ = w.Write([]byte(": <code>"))
 				for k, v := range ch.Properties {
 					if k == "bot_token" || k == "smtp_pass" || k == "smtp_user" || k == "smtp_from" {
-						w.Write([]byte(k + "=***; "))
+						_, _ = w.Write([]byte(k + "=***; "))
 					} else {
-						w.Write([]byte(k + "=" + v + "; "))
+						_, _ = w.Write([]byte(k + "=" + v + "; "))
 					}
 				}
-				w.Write([]byte("</code>"))
+				_, _ = w.Write([]byte("</code>"))
 			}
-			w.Write([]byte("</li>"))
+			_, _ = w.Write([]byte("</li>"))
 		}
-		w.Write([]byte(`</ul>`))
+		_, _ = w.Write([]byte(`</ul>`))
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

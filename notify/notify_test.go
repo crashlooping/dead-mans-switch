@@ -23,7 +23,10 @@ func TestRegisterAndCreateNotifier(t *testing.T) {
 	if !ok {
 		t.Fatal("wrong type")
 	}
-	n.Notify("subj", "msg")
+	err := n.Notify("subj", "msg")
+	if err != nil {
+		t.Errorf("Notify returned error: %v", err)
+	}
 	if len(tn.called) != 1 {
 		t.Error("Notify not called")
 	}

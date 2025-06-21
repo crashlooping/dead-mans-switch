@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/nikoksr/notify"
@@ -12,7 +13,7 @@ type TelegramNotifier struct {
 }
 
 func (t *TelegramNotifier) Notify(subject, message string) error {
-	return t.n.Send(nil, subject, message)
+	return t.n.Send(context.TODO(), subject, message)
 }
 
 func NewTelegramNotifier(props map[string]string) Notifier {

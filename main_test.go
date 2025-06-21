@@ -12,15 +12,6 @@ import (
 	"github.com/crashlooping/dead-mans-switch/dead-mans-switch/db"
 )
 
-type notifierMock struct {
-	calls []string
-}
-
-func (n *notifierMock) Notify(subject, message string) error {
-	n.calls = append(n.calls, subject+":"+message)
-	return nil
-}
-
 func TestHeartbeatEndpoint(t *testing.T) {
 	dbPath := "test-heartbeats.db"
 	dbInstance, _ = db.Open(dbPath)
@@ -34,7 +25,10 @@ func TestHeartbeatEndpoint(t *testing.T) {
 		}
 		var body req
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		dbInstance.UpdateHeartbeat(body.Name, time.Now(), false)
+		if err := dbInstance.UpdateHeartbeat(body.Name, time.Now(), false); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 	ts := httptest.NewServer(h)
