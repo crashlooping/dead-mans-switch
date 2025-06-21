@@ -61,6 +61,16 @@ docker build -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
 docker run -v $(pwd)/config.yaml:/app/config.yaml -p 8080:8080 ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
 ```
 
+#### Docker Compose
+
+A sample [`docker-compose.yaml`](docker-compose.yaml) is provided for easy deployment:
+
+```sh
+docker compose up -d
+```
+
+This will start the service, mount your config and data, and expose port 8080.
+
 ### 3. Web Frontend
 
 Visit [http://localhost:8080/](http://localhost:8080/) in your browser to view:

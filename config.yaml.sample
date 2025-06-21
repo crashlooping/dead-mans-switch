@@ -1,0 +1,16 @@
+listen_addr: ":8080" # Address to listen on, e.g., ":8080" for all interfaces or "
+timeout_seconds: 180 # Timeout in seconds before the switch is triggered
+notification_channels:
+  - type: smtp
+    to: "user@example.com"
+    smtp_server: "smtp.example.com"
+    smtp_port: "587"           # 25 (plain), 465 (ssl), 587 (starttls)
+    smtp_user: "user"
+    smtp_pass: "pass"
+    smtp_from: "sender@example.com" # optional, defaults to smtp_user
+    smtp_security: "starttls"  # plain, ssl, or starttls
+  - type: telegram
+    bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    chat_id: "-123456789"
+  - type: dummy # Dummy channel for testing, does not send notifications
+    to: "test@example.com"
