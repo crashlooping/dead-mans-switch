@@ -1,16 +1,17 @@
 # Dead Man's Switch
 
-A Go-based tool that monitors for regular HTTP POST updates from another application. If updates stop, it sends notifications via configurable channels (email, Slack, Teams, Telegram, etc.).
+A Go-based tool that monitors for regular HTTP POST updates from another application. If updates stop, it sends notifications via configurable channels (email/SMTP, Telegram, dummy, etc.).
 
 ## Features
 
-- Monitors HTTP POST updates
-- Sends notifications via multiple, configurable channels
+- Monitors HTTP POST updates from clients
+- Sends notifications via multiple, configurable channels (SMTP, Telegram, dummy, etc.)
 - Configurable via `config.yaml` or environment variables
+- Simple web frontend (with htmx) to view device status and notification config
 - Runs natively (Windows/Linux) or in Docker
-- Multi-platform builds and Docker image publishing
-- Extensible notification system
-- Includes tests
+- Multi-platform builds and Docker image publishing (amd64, arm64, arm/v7)
+- Extensible notification system (pluggable channels)
+- Includes tests and CI/CD
 
 ## Quick Start
 
@@ -22,13 +23,19 @@ Create a `config.yaml` file in the working directory. Example:
 listen_addr: ":8080"
 timeout_seconds: 600
 notification_channels:
-  - type: email
+  - type: smtp
     to: "user@example.com"
     smtp_server: "smtp.example.com"
+    smtp_port: "587"           # 25 (plain), 465 (ssl), 587 (starttls)
     smtp_user: "user"
     smtp_pass: "pass"
-  - type: slack
-    webhook_url: "https://hooks.slack.com/services/..."
+    smtp_from: "sender@example.com" # optional, defaults to smtp_user
+    smtp_security: "starttls"  # plain, ssl, or starttls
+  - type: telegram
+    bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    chat_id: "-123456789"
+  - type: dummy
+    to: "test@example.com"
 ```
 
 You can override any config value with environment variables (e.g., `LISTEN_ADDR`, `TIMEOUT_SECONDS`).
@@ -54,7 +61,16 @@ docker build -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
 docker run -v $(pwd)/config.yaml:/app/config.yaml -p 8080:8080 ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
 ```
 
-### 3. Sending Updates
+### 3. Web Frontend
+
+Visit [http://localhost:8080/](http://localhost:8080/) in your browser to view:
+- A live-updating table of all device heartbeats and status
+- A list of all configured notification channels (with sensitive fields masked)
+- A link to the GitHub repository
+
+The frontend is built with [htmx](https://htmx.org/) and [Water.css](https://watercss.kognise.dev/) for a modern, minimal look.
+
+### 4. Sending Heartbeats
 
 Send a heartbeat (HTTP POST) to keep the switch alive:
 
@@ -83,11 +99,12 @@ The tool stores all heartbeats in a BoltDB database file at `./data/heartbeats.d
 ## Building and CI/CD
 
 - Binaries for Windows (x64) and Linux (x64, ARM) are built via GitHub Actions.
-- Docker images are built and pushed to the GitHub Container Registry.
+- Docker images are built and pushed to the GitHub Container Registry for all major platforms.
+- Multi-arch Docker images are available under the `:latest` tag.
 
 ## Extending Notifications
 
-Notification channels are pluggable. Add new types by implementing the `Notifier` interface.
+Notification channels are pluggable. Add new types by implementing the `Notifier` interface in Go and registering them.
 
 ## Tests
 
@@ -99,4 +116,4 @@ go test ./...
 
 ---
 
-For more details, see inline comments and documentation.
+For more details, see inline comments, the [web frontend](web/index.html), and [GitHub](https://github.com/crashlooping/dead-mans-switch/).
