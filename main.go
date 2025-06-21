@@ -143,6 +143,60 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(heartbeats)
 	})
+
+	// Web frontend: serve static index.html
+	http.HandleFunc("/web", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/index.html")
+	})
+
+	http.HandleFunc("/web/devices", func(w http.ResponseWriter, r *http.Request) {
+		heartbeats, err := dbInstance.GetAllHeartbeats()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("DB error"))
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(`<table>
+			<thead><tr><th>Device</th><th>Last Seen</th><th>Missing</th></tr></thead><tbody>`))
+		for name, ch := range heartbeats {
+			w.Write([]byte("<tr>"))
+			w.Write([]byte("<td>" + name + "</td>"))
+			w.Write([]byte("<td>" + ch.Timestamp.Format("2006-01-02 15:04:05") + "</td>"))
+			if ch.Missing {
+				w.Write([]byte("<td style='color:red'>Yes</td>"))
+			} else {
+				w.Write([]byte("<td style='color:green'>No</td>"))
+			}
+			w.Write([]byte("</tr>"))
+		}
+		w.Write([]byte("</tbody></table>"))
+	})
+
+	http.HandleFunc("/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(`<ul>`))
+		for _, ch := range cfg.NotificationChannels {
+			w.Write([]byte("<li><b>" + ch.Type + "</b>"))
+			if len(ch.Properties) > 0 {
+				w.Write([]byte(": <code>"))
+				for k, v := range ch.Properties {
+					if k == "bot_token" || k == "smtp_pass" || k == "smtp_user" || k == "smtp_from" {
+						w.Write([]byte(k + "=***; "))
+					} else {
+						w.Write([]byte(k + "=" + v + "; "))
+					}
+				}
+				w.Write([]byte("</code>"))
+			}
+			w.Write([]byte("</li>"))
+		}
+		w.Write([]byte(`</ul>`))
+	})
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/web", http.StatusFound)
+	})
 	server := &http.Server{Addr: cfg.ListenAddr}
 	go func() {
 		log.Printf("Starting server on %s", cfg.ListenAddr)
