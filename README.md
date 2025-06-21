@@ -61,20 +61,24 @@ Send a heartbeat (HTTP POST) to keep the switch alive:
 #### curl
 
 ```sh
-curl -X POST http://localhost:8080/heartbeat
+curl -X POST http://localhost:8080/heartbeat -H "Content-Type: application/json" -d '{"name": "client1"}'
 ```
 
 #### wget
 
 ```sh
-wget --method=POST http://localhost:8080/heartbeat
+wget --method=POST --header="Content-Type: application/json" --body-data='{"name": "client1"}' http://localhost:8080/heartbeat
 ```
 
 #### PowerShell
 
 ```powershell
-Invoke-WebRequest -Uri http://localhost:8080/heartbeat -Method POST
+Invoke-WebRequest -Uri http://localhost:8080/heartbeat -Method POST -Body '{"name": "client1"}' -ContentType 'application/json'
 ```
+
+## Persistent Storage
+
+The tool stores all heartbeats in a BoltDB database file at `./data/heartbeats.db` by default. When running in Docker, the `data` directory is mounted as a persistent volume.
 
 ## Building and CI/CD
 

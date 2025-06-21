@@ -1,0 +1,21 @@
+### Heartbeat request 1
+
+POST http://localhost:8080/heartbeat
+Content-Type: application/json
+
+{
+  "name": "client1"
+}
+
+### Heartbeat request 2
+
+POST http://localhost:8080/heartbeat
+Content-Type: application/json
+
+{
+  "name": "client2"
+}
+
+### Get all heartbeats
+
+GET http://localhost:8080/heartbeats

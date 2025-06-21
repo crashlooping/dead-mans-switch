@@ -25,5 +25,8 @@ notification_channels:
 	if len(cfg.NotificationChannels) != 1 || cfg.NotificationChannels[0].Type != "dummy" {
 		t.Errorf("notification_channels not loaded")
 	}
+	if cfg.NotificationChannels[0].Properties["to"] != "a@b.com" {
+		t.Errorf("notification channel property not loaded")
+	}
 	os.Remove("test.yaml")
 }
