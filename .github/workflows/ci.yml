@@ -15,11 +15,15 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 'stable'
-      - name: Lint and Test
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.1
+          args: --enable=unused --out-format=tab
+      - name: Test
         run: |
           go vet ./...
           go test -cover ./...
-          golangci-lint run --enable=unused --out-format=tab
 
   build:
     runs-on: ubuntu-latest
