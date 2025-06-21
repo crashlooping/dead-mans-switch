@@ -48,8 +48,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
-      - name: Build and push multi-arch Docker image
+      - name: Build and push Docker image (amd64)
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+          docker buildx build --platform linux/amd64 -t ghcr.io/${{ github.repository }}:amd64 --push .
+      - name: Build and push Docker image (arm64)
+        run: |
+          docker buildx build --platform linux/arm64 -t ghcr.io/${{ github.repository }}:arm64 --push .
+      - name: Build and push Docker image (arm/v7)
+        run: |
+          docker buildx build --platform linux/arm/v7 -t ghcr.io/${{ github.repository }}:armv7 --push .
+      - name: Create and push multi-arch manifest as latest
+        run: |
+          docker buildx imagetools create \
             -t ghcr.io/${{ github.repository }}:latest \
-            --push .
+            ghcr.io/${{ github.repository }}:amd64 \
+            ghcr.io/${{ github.repository }}:arm64 \
+            ghcr.io/${{ github.repository }}:armv7
