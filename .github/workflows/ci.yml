@@ -26,7 +26,11 @@ jobs:
         run: go test ./...
       - name: Build
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }} .
+          if [ "$GOOS" = "windows" ]; then \
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }}.exe .; \
+          else \
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }} .; \
+          fi
 
   docker:
     runs-on: ubuntu-latest
@@ -44,6 +48,6 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       - name: Build and push multi-arch Docker image
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64 \
+          docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
             -t ghcr.io/${{ github.repository }}:latest \
             --push .
