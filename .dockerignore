@@ -1,0 +1,26 @@
+# Ignore everything by default
+*
+
+# But not these files...
+!go.mod
+!go.sum
+!main.go
+!config/
+!notify/
+!db/
+!Dockerfile
+
+# Ignore test files and build/test output
+*.test
+*.exe
+*.out
+*.log
+/build/
+/bin/
+/test.db
+/test-heartbeats.db
+.vscode/
+.git/
+.gitignore
+README.md
+*.md
