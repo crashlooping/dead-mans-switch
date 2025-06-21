@@ -1,50 +1,26 @@
 package notify
 
 import (
-	"fmt"
-	"net/smtp"
+	"context"
+
+	"github.com/nikoksr/notify"
+	notifyMail "github.com/nikoksr/notify/service/mail"
 )
 
 type SMTPNotifier struct {
-	To     string
-	Server string
-	User   string
-	Pass   string
-	From   string
+	n *notify.Notify
 }
 
 func (s *SMTPNotifier) Notify(subject, message string) error {
-	from := s.From
-	if from == "" {
-		from = s.User
-	}
-	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n", from, s.To, subject)
-	body := headers + message
-	auth := smtp.PlainAuth("", s.User, s.Pass, s.Server)
-	addr := s.Server
-	if !containsPort(addr) {
-		addr += ":587"
-	}
-	return smtp.SendMail(addr, auth, from, []string{s.To}, []byte(body))
-}
-
-func containsPort(addr string) bool {
-	for i := len(addr) - 1; i >= 0; i-- {
-		if addr[i] == ':' {
-			return true
-		}
-	}
-	return false
+	return s.n.Send(context.Background(), subject, message)
 }
 
 func NewSMTPNotifier(props map[string]string) Notifier {
-	return &SMTPNotifier{
-		To:     props["to"],
-		Server: props["smtp_server"],
-		User:   props["smtp_user"],
-		Pass:   props["smtp_pass"],
-		From:   props["smtp_from"],
-	}
+	mail := notifyMail.New(props["smtp_user"], props["smtp_pass"])
+	mail.AddReceivers(props["to"])
+	n := notify.New()
+	n.UseServices(mail)
+	return &SMTPNotifier{n: n}
 }
 
 func init() {
