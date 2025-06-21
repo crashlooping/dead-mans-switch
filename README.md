@@ -164,6 +164,18 @@ Run tests with:
 go test ./...
 ```
 
+## Health Check
+
+A simple health endpoint is available at `/up`:
+
+```sh
+curl -i http://localhost:8080/up
+```
+
+This will return ```HTTP/1.1 200 OK```
+
+You can use this endpoint for monitoring and readiness/liveness checks in Docker, Kubernetes, or other orchestration systems.
+
 ---
 
 For more details, see inline comments, the [web frontend](web/index.html), and [GitHub](https://github.com/crashlooping/dead-mans-switch/).

@@ -48,3 +48,29 @@ func TestHeartbeatEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 }
+
+func TestHealthEndpoint(t *testing.T) {
+	h := http.NewServeMux()
+	h.HandleFunc("/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	ts := httptest.NewServer(h)
+	defer func() {
+		ts.Close()
+	}()
+
+	resp, err := http.Get(ts.URL + "/up")
+	if err != nil {
+		t.Fatalf("GET /up failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 16)
+	n, _ := resp.Body.Read(buf)
+	if string(buf[:n]) != "ok" {
+		t.Errorf("expected body 'ok', got '%s'", string(buf[:n]))
+	}
+}

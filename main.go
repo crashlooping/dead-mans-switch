@@ -285,6 +285,11 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		_, _ = w.Write([]byte(`</ul>`))
 	})
 
+	http.HandleFunc("/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/web", http.StatusFound)
 	})
