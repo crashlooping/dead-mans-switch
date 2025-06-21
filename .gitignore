@@ -1,0 +1,25 @@
+# Binaries
+/dead-mans-switch*
+*.exe
+*.out
+*.test
+
+# Build directories
+/build/
+/bin/
+
+# VSCode
+.vscode/
+
+# Config
+config.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test output
+*.log
+
+# Go modules
+vendor/

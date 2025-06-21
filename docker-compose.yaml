@@ -1,0 +1,9 @@
+services:
+  dead-mans-switch:
+    image: ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
+    container_name: dead-mans-switch
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
