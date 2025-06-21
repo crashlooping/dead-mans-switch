@@ -19,7 +19,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1
-          args: --enable=unused --out-format=tab
+          args: --enable=unused
       - name: Test
         run: |
           go vet ./...
