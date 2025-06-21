@@ -42,7 +42,9 @@ func (s *SMTPNotifier) Notify(subject, message string) error {
 		if err != nil {
 			return err
 		}
-		defer c.Close()
+		defer func() {
+			_ = c.Close() // error ignored, as defer cannot return error
+		}()
 		if err = c.StartTLS(&tls.Config{ServerName: host}); err != nil {
 			return err
 		}

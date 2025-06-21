@@ -12,7 +12,14 @@ func TestHeartbeatAndMissingState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer func() { db.Close(); os.Remove("test.db") }()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("db.Close() error: %v", err)
+		}
+		if err := os.Remove("test.db"); err != nil && !os.IsNotExist(err) {
+			t.Fatalf("os.Remove error: %v", err)
+		}
+	}()
 
 	name := "client1"
 	now := time.Now().Truncate(time.Second)

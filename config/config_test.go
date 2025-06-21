@@ -30,5 +30,7 @@ notification_channels:
 	if cfg.NotificationChannels[0].Properties["to"] != "a@b.com" {
 		t.Errorf("notification channel property not loaded")
 	}
-	os.Remove("test.yaml")
+	if err := os.Remove("test.yaml"); err != nil {
+		t.Errorf("os.Remove error: %v", err)
+	}
 }

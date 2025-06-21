@@ -26,7 +26,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	file, err := os.Open(path)
 	if err == nil {
-		defer file.Close()
+		defer func() {
+			_ = file.Close()
+		}()
 		if err := yaml.NewDecoder(file).Decode(cfg); err != nil {
 			// Log or handle YAML decode error
 			return nil, err

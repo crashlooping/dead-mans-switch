@@ -15,8 +15,14 @@ import (
 func TestHeartbeatEndpoint(t *testing.T) {
 	dbPath := "test-heartbeats.db"
 	dbInstance, _ = db.Open(dbPath)
-	defer dbInstance.Close()
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := dbInstance.Close(); err != nil {
+			t.Errorf("dbInstance.Close() error: %v", err)
+		}
+		if err := os.Remove(dbPath); err != nil {
+			t.Errorf("os.Remove error: %v", err)
+		}
+	}()
 
 	h := http.NewServeMux()
 	h.HandleFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) {

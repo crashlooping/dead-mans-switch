@@ -128,7 +128,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open DB: %v", err)
 	}
-	defer dbInstance.Close()
+	defer func() {
+		if err := dbInstance.Close(); err != nil {
+			log.Printf("DB close error: %v", err)
+		}
+	}()
 	notifiers := setupNotifiers(cfg)
 	go monitor(cfg, notifiers)
 	os.Exit(runServer(cfg, notifiers))
@@ -170,12 +174,16 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			html += "</tr>"
 		}
 		html += "</tbody></table>"
-		fmt.Fprintf(w, "data: %s\n\n", html)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", html); err != nil {
+			log.Printf("Fprintf error: %v", err)
+		}
 		w.(http.Flusher).Flush()
 		for {
 			select {
 			case msg := <-ch:
-				fmt.Fprintf(w, "data: %s\n\n", msg)
+				if _, err := fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+					log.Printf("Fprintf error: %v", err)
+				}
 				w.(http.Flusher).Flush()
 			case <-r.Context().Done():
 				return
@@ -291,7 +299,9 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down server...")
-	server.Close()
+	if err := server.Close(); err != nil {
+		log.Printf("server close error: %v", err)
+	}
 	return 0
 }
 
