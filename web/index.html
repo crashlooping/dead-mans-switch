@@ -6,44 +6,46 @@
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
 </head>
-<body data-base-path="">
+<body>
     <h1>Device Heartbeats</h1>
     <div id="device-table">Loading device data...</div>
     <script>
-    // Get basePath from <body data-base-path>
-    const basePath = document.body.getAttribute('data-base-path') || '';
-    const evtSource = new EventSource(basePath + '/events');
-    evtSource.onmessage = function(e) {
-        document.getElementById('device-table').innerHTML = e.data;
-        convertTimestamps();
-    };
-    function convertTimestamps() {
-        document.querySelectorAll('#device-table td[data-utc]').forEach(function(cell) {
-            const utc = cell.getAttribute('data-utc');
-            if (utc) {
-                const d = new Date(utc);
-                if (!isNaN(d)) {
-                    cell.textContent = d.toLocaleString();
+    window.addEventListener('DOMContentLoaded', function() {
+        const basePath = document.body.getAttribute('data-base-path') || '';
+        const eventsUrl = (basePath && basePath !== '/') ? basePath + '/events' : '/events';
+        const evtSource = new EventSource(eventsUrl);
+        evtSource.onmessage = function(e) {
+            document.getElementById('device-table').innerHTML = e.data;
+            convertTimestamps();
+        };
+        function convertTimestamps() {
+            document.querySelectorAll('#device-table td[data-utc]').forEach(function(cell) {
+                const utc = cell.getAttribute('data-utc');
+                if (utc) {
+                    const d = new Date(utc);
+                    if (!isNaN(d)) {
+                        cell.textContent = d.toLocaleString();
+                    }
                 }
-            }
-        });
-    }
-    // Also convert on initial load (in case table is present)
-    window.addEventListener('DOMContentLoaded', convertTimestamps);
+            });
+        }
+        convertTimestamps();
+    });
     </script>
     <h2>Configured Notifications</h2>
-    <div id="notification-list" hx-get="web/configured-notifications" hx-trigger="load" hx-swap="outerHTML" data-hx-base-path="">
+    <div id="notification-list" hx-get="web/configured-notifications" hx-trigger="load" hx-swap="outerHTML">
         Loading notification channels...
     </div>
     <script>
-    // Patch htmx to use basePath for all hx-get/hx-post URLs
     document.addEventListener('htmx:configRequest', function(evt) {
         const basePath = document.body.getAttribute('data-base-path') || '';
-        if (evt.detail.path && !evt.detail.path.startsWith(basePath)) {
-            if (evt.detail.path.startsWith('/')) {
-                evt.detail.path = basePath + evt.detail.path;
-            } else {
-                evt.detail.path = basePath + '/' + evt.detail.path;
+        if (basePath && basePath !== '/') {
+            if (evt.detail.path && !evt.detail.path.startsWith(basePath)) {
+                if (evt.detail.path.startsWith('/')) {
+                    evt.detail.path = basePath + evt.detail.path;
+                } else {
+                    evt.detail.path = basePath + '/' + evt.detail.path;
+                }
             }
         }
     });
