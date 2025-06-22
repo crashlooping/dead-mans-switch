@@ -150,7 +150,7 @@ The tool stores all heartbeats in a BoltDB database file at `./data/heartbeats.d
 
 If you want to serve the app under a subpath (e.g., `https://yourdomain.com/dead-mans-switch`) behind a reverse proxy (such as Traefik or Nginx), set the `BASE_PATH` environment variable:
 
-```
+```text
 BASE_PATH=/dead-mans-switch
 ```
 
@@ -169,6 +169,7 @@ services:
 ```
 
 **Note:**
+
 - Your reverse proxy must also be configured to forward requests from the subpath to the container.
 - If you run the app at the root (e.g., `https://yourdomain.com/`), you do not need to set `BASE_PATH`.
 
