@@ -67,9 +67,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
-      - name: Build and push multi-arch Docker image
+      # - name: Build and push multi-arch Docker image
+      #   run: |
+      #     docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+      #       -t ghcr.io/${{ github.repository }}/dead-mans-switch:latest \
+      #       --push .
+      - name: Build and push multi-arch Docker image (amd64 only)
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+          docker buildx build --platform linux/amd64 \
             -t ghcr.io/${{ github.repository }}/dead-mans-switch:latest \
             --push .
 

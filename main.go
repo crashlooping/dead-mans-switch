@@ -292,6 +292,13 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Only redirect if the path is exactly "/" or ends with the subpath root (e.g., /dead-mans-switch or /dead-mans-switch/)
+		if strings.HasSuffix(r.URL.Path, "/web") || strings.HasSuffix(r.URL.Path, "/web/") {
+			// Already at /web, serve normally (let other handlers take over)
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte("Not found"))
+			return
+		}
 		// Compute the base path (if behind a reverse proxy with subpath)
 		base := r.URL.Path
 		if !strings.HasSuffix(base, "/") {
