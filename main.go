@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"sort"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -140,7 +139,13 @@ func main() {
 }
 
 func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
-	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+	basePath := os.Getenv("BASE_PATH") // e.g. "/dead-mans-switch"
+	if basePath == "/" {
+		basePath = ""
+	}
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(basePath+"/events", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
@@ -192,7 +197,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		}
 	})
 
-	http.HandleFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/heartbeat", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -238,7 +243,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		_, _ = w.Write([]byte("OK"))
 	})
 
-	http.HandleFunc("/heartbeats", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/heartbeats", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -255,17 +260,17 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		}
 	})
 
-	// Web frontend: serve static index.html
-	http.HandleFunc("/web", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/web", func(w http.ResponseWriter, r *http.Request) {
+		// Serve static index.html
 		http.ServeFile(w, r, "web/index.html")
 	})
 
-	http.HandleFunc("/web/devices", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/web/devices", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<div id='device-table'></div>`)) // placeholder, SSE will update
 	})
 
-	http.HandleFunc("/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<ul>`))
 		for _, ch := range cfg.NotificationChannels {
@@ -286,34 +291,27 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		_, _ = w.Write([]byte(`</ul>`))
 	})
 
-	http.HandleFunc("/up", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(basePath+"/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Only redirect if the path is exactly "/" or ends with the subpath root (e.g., /dead-mans-switch or /dead-mans-switch/)
-		if strings.HasSuffix(r.URL.Path, "/web") || strings.HasSuffix(r.URL.Path, "/web/") {
-			// Already at /web, serve normally (let other handlers take over)
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte("Not found"))
+	// Serve static files under /web if needed (e.g. /web/htmx.js)
+	mux.Handle(basePath+"/web/", http.StripPrefix(basePath+"/web/", http.FileServer(http.Dir("web"))))
+
+	mux.HandleFunc(basePath+"/", func(w http.ResponseWriter, r *http.Request) {
+		// Only redirect if the path is exactly basePath or basePath+
+		if r.URL.Path == basePath || r.URL.Path == basePath+"/" {
+			http.Redirect(w, r, basePath+"/web", http.StatusFound)
 			return
 		}
-		// Compute the base path (if behind a reverse proxy with subpath)
-		base := r.URL.Path
-		if !strings.HasSuffix(base, "/") {
-			base = base + "/"
-		}
-		// Remove trailing slash if path is just "/"
-		if base == "/" {
-			base = ""
-		}
-		// Redirect to base + "web"
-		http.Redirect(w, r, base+"web", http.StatusFound)
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("Not found"))
 	})
-	server := &http.Server{Addr: cfg.ListenAddr}
+
+	server := &http.Server{Addr: cfg.ListenAddr, Handler: mux}
 	go func() {
-		log.Printf("Starting server on %s", cfg.ListenAddr)
+		log.Printf("Starting server on %s (basePath: %s)", cfg.ListenAddr, basePath)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("ListenAndServe(): %s", err)
 		}

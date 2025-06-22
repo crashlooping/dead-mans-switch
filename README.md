@@ -146,6 +146,32 @@ Invoke-WebRequest -Uri http://localhost:8080/heartbeat -Method POST -Body '{"nam
 
 The tool stores all heartbeats in a BoltDB database file at `./data/heartbeats.db` by default. When running in Docker, the `data` directory is mounted as a persistent volume.
 
+## Running Behind a Reverse Proxy (BASE_PATH)
+
+If you want to serve the app under a subpath (e.g., `https://yourdomain.com/dead-mans-switch`) behind a reverse proxy (such as Traefik or Nginx), set the `BASE_PATH` environment variable:
+
+```
+BASE_PATH=/dead-mans-switch
+```
+
+This will prefix all routes (web UI, API, static files) with `/dead-mans-switch`, so your app is accessible at `https://yourdomain.com/dead-mans-switch/web` and all links, redirects, and API endpoints will work correctly.
+
+**Docker Compose example:**
+
+```yaml
+services:
+  dead-mans-switch:
+    image: ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
+    environment:
+      - TZ=Europe/Berlin
+      - BASE_PATH=/dead-mans-switch
+    # ...other config...
+```
+
+**Note:**
+- Your reverse proxy must also be configured to forward requests from the subpath to the container.
+- If you run the app at the root (e.g., `https://yourdomain.com/`), you do not need to set `BASE_PATH`.
+
 ## Building and CI/CD
 
 - Binaries for Windows (x64) and Linux (x64, ARM) are built via GitHub Actions.
