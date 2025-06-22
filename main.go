@@ -343,7 +343,9 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 				}
 			}
 			masked := strings.Join(lines, "\n")
-			w.Write([]byte(masked))
+			if _, err := w.Write([]byte(masked)); err != nil {
+				log.Printf("error writing masked config: %v", err)
+			}
 			return
 		}
 		// fallback: show as JSON with masked secrets

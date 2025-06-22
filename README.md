@@ -209,6 +209,22 @@ This will return ```HTTP/1.1 200 OK```
 
 You can use this endpoint for monitoring and readiness/liveness checks in Docker, Kubernetes, or other orchestration systems.
 
+### Git Hooks with Lefthook
+
+This project uses [Lefthook](https://github.com/evilmartians/lefthook) to run `golangci-lint` automatically before each commit.
+
+**Setup:**
+
+```sh
+# Install lefthook (if not already installed)
+go install github.com/evilmartians/lefthook@latest
+
+# Install git hooks
+lefthook install
+```
+
+Now, every commit will run `golangci-lint run --enable=unused --tests=false` and block the commit if there are any linter errors.
+
 ---
 
 *This project was built and iteratively improved with the help of GitHub Copilot.*
