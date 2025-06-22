@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -291,7 +292,17 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/web", http.StatusFound)
+		// Compute the base path (if behind a reverse proxy with subpath)
+		base := r.URL.Path
+		if !strings.HasSuffix(base, "/") {
+			base = base + "/"
+		}
+		// Remove trailing slash if path is just "/"
+		if base == "/" {
+			base = ""
+		}
+		// Redirect to base + "web"
+		http.Redirect(w, r, base+"web", http.StatusFound)
 	})
 	server := &http.Server{Addr: cfg.ListenAddr}
 	go func() {
