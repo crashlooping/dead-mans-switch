@@ -9,6 +9,7 @@
 !notify/
 !db/
 !Dockerfile
+!web/
 
 # Ignore test files and build/test output
 *.test
