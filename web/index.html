@@ -13,7 +13,21 @@
     const evtSource = new EventSource('/events');
     evtSource.onmessage = function(e) {
         document.getElementById('device-table').innerHTML = e.data;
+        convertTimestamps();
     };
+    function convertTimestamps() {
+        document.querySelectorAll('#device-table td[data-utc]').forEach(function(cell) {
+            const utc = cell.getAttribute('data-utc');
+            if (utc) {
+                const d = new Date(utc);
+                if (!isNaN(d)) {
+                    cell.textContent = d.toLocaleString();
+                }
+            }
+        });
+    }
+    // Also convert on initial load (in case table is present)
+    window.addEventListener('DOMContentLoaded', convertTimestamps);
     </script>
     <h2>Configured Notifications</h2>
     <div id="notification-list" hx-get="/web/configured-notifications" hx-trigger="load" hx-swap="outerHTML">

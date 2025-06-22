@@ -91,7 +91,7 @@ func broadcastDeviceTable() {
 		ch := heartbeats[name]
 		html += "<tr>"
 		html += "<td>" + name + "</td>"
-		html += "<td>" + ch.Timestamp.Format("2006-01-02 15:04:05") + "</td>"
+		html += `<td data-utc='` + ch.Timestamp.UTC().Format(time.RFC3339) + `'>` + ch.Timestamp.UTC().Format(time.RFC3339) + "</td>"
 		if ch.Missing {
 			html += "<td style='color:red'>Yes</td>"
 		} else {
@@ -165,7 +165,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			chb := heartbeats[name]
 			html += "<tr>"
 			html += "<td>" + name + "</td>"
-			html += "<td>" + chb.Timestamp.Format("2006-01-02 15:04:05") + "</td>"
+			html += `<td data-utc='` + chb.Timestamp.UTC().Format(time.RFC3339) + `'>` + chb.Timestamp.UTC().Format(time.RFC3339) + "</td>"
 			if chb.Missing {
 				html += "<td style='color:red'>Yes</td>"
 			} else {
