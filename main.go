@@ -103,9 +103,13 @@ func broadcastDeviceTable() {
 		html += "<td>" + name + "</td>"
 		html += `<td data-utc='` + ch.Timestamp.UTC().Format(time.RFC3339) + `'>` + ch.Timestamp.UTC().Format(time.RFC3339) + "</td>"
 		if ch.Missing {
-			html += "<td style='color:red'>Yes</td>"
+			html += `<td class='status status-yes'><span class='status-icon' aria-label='Missing' title='Missing'>` +
+				`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#e53e3e' stroke-width='2' fill='none'/><line x1='5' y1='5' x2='11' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/><line x1='11' y1='5' x2='5' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/></svg>` +
+				`</span> <span class='status-text'>yes</span></td>`
 		} else {
-			html += "<td style='color:green'>No</td>"
+			html += `<td class='status status-no'><span class='status-icon' aria-label='OK' title='OK'>` +
+				`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#38a169' stroke-width='2' fill='none'/><polyline points='5,9 8,12 12,5' stroke='#38a169' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>` +
+				`</span> <span class='status-text'>no</span></td>`
 		}
 		html += "</tr>"
 	}
@@ -183,9 +187,13 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			html += "<td>" + name + "</td>"
 			html += `<td data-utc='` + chb.Timestamp.UTC().Format(time.RFC3339) + `'>` + chb.Timestamp.UTC().Format(time.RFC3339) + "</td>"
 			if chb.Missing {
-				html += "<td style='color:red'>Yes</td>"
+				html += `<td class='status status-yes'><span class='status-icon' aria-label='Missing' title='Missing'>` +
+					`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#e53e3e' stroke-width='2' fill='none'/><line x1='5' y1='5' x2='11' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/><line x1='11' y1='5' x2='5' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/></svg>` +
+					`</span> <span class='status-text'>yes</span></td>`
 			} else {
-				html += "<td style='color:green'>No</td>"
+				html += `<td class='status status-no'><span class='status-icon' aria-label='OK' title='OK'>` +
+					`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#38a169' stroke-width='2' fill='none'/><polyline points='5,9 8,12 12,5' stroke='#38a169' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>` +
+					`</span> <span class='status-text'>no</span></td>`
 			}
 			html += "</tr>"
 		}
