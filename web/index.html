@@ -3,12 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <title>Dead Man's Switch - Devices</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <style>
+    .tab-btn {
+        padding: 0.5em 1.2em;
+        border: none;
+        background: #e0e7ef;
+        color: #222;
+        font-size: 1em;
+        border-radius: 0.5em 0.5em 0 0;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-bottom: -2px;
+    }
+    .tab-btn.active, .tab-btn:focus {
+        background: #b3c6e0;
+        font-weight: bold;
+        outline: none;
+    }
+    #tab-content {
+        background: #f8fafc;
+        border-radius: 0 0 0.5em 0.5em;
+        padding: 1em;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    @media (max-width: 600px) {
+        h1 {
+            font-size: 1.2em;
+        }
+        .tab-btn {
+            font-size: 0.95em;
+            padding: 0.5em 0.7em;
+        }
+        #tab-content {
+            padding: 0.5em;
+        }
+        pre {
+            font-size: 0.9em;
+        }
+    }
+    .icon {
+        vertical-align: middle;
+        margin-right: 0.5em;
+        width: 1.2em;
+        height: 1.2em;
+        display: inline-block;
+    }
+    </style>
 </head>
 <body>
     <h1>Device Heartbeats</h1>
-    <div id="device-table">Loading device data...</div>
+    <div style="margin-bottom:1.5em;">
+        <button id="tab-devices" class="tab-btn" style="margin-right:1em;">
+            <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm2 0v10h12V5H4zm2 2h8v2H6V7zm0 4h5v2H6v-2z"/></svg>
+            </span>
+            Devices
+        </button>
+        <button id="tab-config" class="tab-btn">
+            <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"/></svg>
+            </span>
+            Config
+        </button>
+    </div>
+    <div id="tab-content">
+        <div id="devices-tab">
+            <div id="device-table">Loading device data...</div>
+        </div>
+        <div id="config-tab" style="display:none;">
+            <pre id="config-content">Loading config...</pre>
+        </div>
+    </div>
     <script>
     window.addEventListener('DOMContentLoaded', function() {
         const basePath = document.body.getAttribute('data-base-path') || '';
@@ -31,12 +99,6 @@
         }
         convertTimestamps();
     });
-    </script>
-    <h2>Configured Notifications</h2>
-    <div id="notification-list" hx-get="web/configured-notifications" hx-trigger="load" hx-swap="outerHTML">
-        Loading notification channels...
-    </div>
-    <script>
     document.addEventListener('htmx:configRequest', function(evt) {
         const basePath = document.body.getAttribute('data-base-path') || '';
         if (basePath && basePath !== '/') {
@@ -49,6 +111,36 @@
             }
         }
     });
+    // Tab logic
+    document.getElementById('tab-devices').onclick = function() {
+        document.getElementById('devices-tab').style.display = '';
+        document.getElementById('config-tab').style.display = 'none';
+        this.classList.add('active');
+        document.getElementById('tab-config').classList.remove('active');
+    };
+    document.getElementById('tab-config').onclick = function() {
+        document.getElementById('devices-tab').style.display = 'none';
+        document.getElementById('config-tab').style.display = '';
+        this.classList.add('active');
+        document.getElementById('tab-devices').classList.remove('active');
+        // Fetch config if not already loaded
+        var pre = document.getElementById('config-content');
+        if (!pre.hasAttribute('data-loaded')) {
+            var basePath = document.body.getAttribute('data-base-path') || '';
+            var configUrl = (basePath && basePath !== '/') ? basePath + '/web/config' : '/web/config';
+            fetch(configUrl)
+                .then(r => r.text())
+                .then(txt => {
+                    pre.textContent = txt;
+                    pre.setAttribute('data-loaded', 'true');
+                })
+                .catch(e => {
+                    pre.textContent = 'Failed to load config: ' + e;
+                });
+        }
+    };
+    // Set initial tab
+    document.getElementById('tab-devices').classList.add('active');
     </script>
     <footer style="margin-top:2em;text-align:center;">
         <a href="https://github.com/crashlooping/dead-mans-switch/" target="_blank" style="display:inline-flex;align-items:center;gap:0.5em;">

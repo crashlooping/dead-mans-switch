@@ -319,6 +319,37 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	mux.HandleFunc(basePath+"/web/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		// Try to read config.yaml and mask secrets
+		content, err := os.ReadFile("config.yaml")
+		if err == nil {
+			lines := strings.Split(string(content), "\n")
+			for i, line := range lines {
+				if strings.Contains(line, "pass:") || strings.Contains(line, "token:") || strings.Contains(line, "bot_token:") {
+					parts := strings.SplitN(line, ":", 2)
+					if len(parts) == 2 {
+						lines[i] = parts[0] + ": **********"
+					}
+				}
+			}
+			masked := strings.Join(lines, "\n")
+			w.Write([]byte(masked))
+			return
+		}
+		// fallback: show as JSON with masked secrets
+		masked := cfg
+		for i := range masked.NotificationChannels {
+			for k := range masked.NotificationChannels[i].Properties {
+				if strings.Contains(k, "pass") || strings.Contains(k, "token") || strings.Contains(k, "secret") {
+					masked.NotificationChannels[i].Properties[k] = "**********"
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(masked)
+	})
+
 	// Serve static files under /web if needed (e.g. /web/htmx.js)
 	mux.Handle(basePath+"/web/", http.StripPrefix(basePath+"/web/", http.FileServer(http.Dir("web"))))
 
