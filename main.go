@@ -283,11 +283,24 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	mux.HandleFunc(basePath+"/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<ul>`))
-		for _, ch := range cfg.NotificationChannels {
+		// Sort notification channels by type
+		notifs := make([]config.NotificationChannel, len(cfg.NotificationChannels))
+		copy(notifs, cfg.NotificationChannels)
+		sort.Slice(notifs, func(i, j int) bool {
+			return notifs[i].Type < notifs[j].Type
+		})
+		for _, ch := range notifs {
 			_, _ = w.Write([]byte("<li><b>" + ch.Type + "</b>"))
 			if len(ch.Properties) > 0 {
 				_, _ = w.Write([]byte(": <code>"))
-				for k, v := range ch.Properties {
+				// Sort property keys
+				var keys []string
+				for k := range ch.Properties {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					v := ch.Properties[k]
 					if k == "bot_token" || k == "smtp_pass" || k == "smtp_user" || k == "smtp_from" {
 						_, _ = w.Write([]byte(k + "=***; "))
 					} else {
