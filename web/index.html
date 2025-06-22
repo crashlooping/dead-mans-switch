@@ -78,6 +78,39 @@
         }
         a { color: #8ab4f8; }
     }
+    body.user-dark {
+        background: #181c20 !important;
+        color: #e0e6ed !important;
+    }
+    body.user-dark #tab-content,
+    body.user-dark .tab-btn,
+    body.user-dark table, body.user-dark th, body.user-dark td, body.user-dark pre {
+        background: #23272e !important;
+        color: #e0e6ed !important;
+    }
+    body.user-dark .tab-btn.active, body.user-dark .tab-btn:focus {
+        background: #2d3743 !important;
+        color: #fff !important;
+    }
+    body.user-dark a { color: #8ab4f8 !important; }
+    body.user-dark header, body.user-dark header * {
+        color: #e0e6ed !important;
+    }
+    body.user-light {
+        background: #fff !important;
+        color: #222 !important;
+    }
+    body.user-light #tab-content,
+    body.user-light .tab-btn,
+    body.user-light table, body.user-light th, body.user-light td, body.user-light pre {
+        background: #f8fafc !important;
+        color: #222 !important;
+    }
+    body.user-light .tab-btn.active, body.user-light .tab-btn:focus {
+        background: #b3c6e0 !important;
+        color: #222 !important;
+    }
+    body.user-light a { color: #1a0dab !important; }
     </style>
 </head>
 <body>
@@ -89,6 +122,9 @@
             </svg>
         </span>
         <h1 style="margin:0;">Device Heartbeats</h1>
+        <button id="theme-toggle" aria-label="Toggle dark mode" style="margin-left:auto;font-size:1.2em;background:none;border:none;cursor:pointer;">
+            <span id="theme-toggle-icon" aria-hidden="true">🌙</span>
+        </button>
     </header>
     <div style="margin-bottom:1.5em;">
         <button id="tab-devices" class="tab-btn" style="margin-right:1em;">
@@ -176,6 +212,45 @@
     };
     // Set initial tab
     document.getElementById('tab-devices').classList.add('active');
+    // Theme toggle logic
+    (function() {
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-toggle-icon');
+        function setTheme(mode) {
+            document.body.classList.remove('user-dark', 'user-light');
+            if (mode === 'dark') {
+                document.body.classList.add('user-dark');
+                themeIcon.textContent = '☀️';
+            } else {
+                document.body.classList.add('user-light');
+                themeIcon.textContent = '🌙';
+            }
+        }
+        function getSystemTheme() {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        function getStoredTheme() {
+            return localStorage.getItem('theme');
+        }
+        function storeTheme(mode) {
+            localStorage.setItem('theme', mode);
+        }
+        // Set initial theme
+        let theme = getStoredTheme() || getSystemTheme();
+        setTheme(theme);
+        themeToggle.addEventListener('click', function() {
+            let current = document.body.classList.contains('user-dark') ? 'dark' : 'light';
+            let next = current === 'dark' ? 'light' : 'dark';
+            setTheme(next);
+            storeTheme(next);
+        });
+        // Update icon if system theme changes and no manual override
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (!getStoredTheme()) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    })();
     </script>
     <footer style="margin-top:2em;text-align:center;">
         <a href="https://github.com/crashlooping/dead-mans-switch/" target="_blank" style="display:inline-flex;align-items:center;gap:0.5em;">
