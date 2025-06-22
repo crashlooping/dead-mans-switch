@@ -229,6 +229,8 @@ Now, every commit will run `golangci-lint run --enable=unused --tests=false` and
 
 ---
 
+**Note:** Some UI icons are from [Heroicons](https://heroicons.com/).
+
 *This project was built and iteratively improved with the help of GitHub Copilot.*
 
 For more details, see inline comments, the [web frontend](web/index.html), and [GitHub](https://github.com/crashlooping/dead-mans-switch/).

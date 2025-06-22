@@ -104,11 +104,13 @@ func broadcastDeviceTable() {
 		html += `<td data-utc='` + ch.Timestamp.UTC().Format(time.RFC3339) + `'>` + ch.Timestamp.UTC().Format(time.RFC3339) + "</td>"
 		if ch.Missing {
 			html += `<td class='status status-yes'><span class='status-icon' aria-label='Missing' title='Missing'>` +
-				`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#e53e3e' stroke-width='2' fill='none'/><line x1='5' y1='5' x2='11' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/><line x1='11' y1='5' x2='5' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/></svg>` +
+				// Not OK SVG (red)
+				`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>` +
 				`</span> <span class='status-text'>yes</span></td>`
 		} else {
 			html += `<td class='status status-no'><span class='status-icon' aria-label='OK' title='OK'>` +
-				`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#38a169' stroke-width='2' fill='none'/><polyline points='5,9 8,12 12,5' stroke='#38a169' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>` +
+				// OK SVG (green)
+				`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>` +
 				`</span> <span class='status-text'>no</span></td>`
 		}
 		html += "</tr>"
@@ -188,11 +190,13 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			html += `<td data-utc='` + chb.Timestamp.UTC().Format(time.RFC3339) + `'>` + chb.Timestamp.UTC().Format(time.RFC3339) + "</td>"
 			if chb.Missing {
 				html += `<td class='status status-yes'><span class='status-icon' aria-label='Missing' title='Missing'>` +
-					`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#e53e3e' stroke-width='2' fill='none'/><line x1='5' y1='5' x2='11' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/><line x1='11' y1='5' x2='5' y2='11' stroke='#e53e3e' stroke-width='2' stroke-linecap='round'/></svg>` +
+					// Not OK SVG (red)
+					`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>` +
 					`</span> <span class='status-text'>yes</span></td>`
 			} else {
 				html += `<td class='status status-no'><span class='status-icon' aria-label='OK' title='OK'>` +
-					`<svg viewBox='0 0 16 16' width='18' height='18' fill='none' style='vertical-align:middle;'><circle cx='8' cy='8' r='7' stroke='#38a169' stroke-width='2' fill='none'/><polyline points='5,9 8,12 12,5' stroke='#38a169' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>` +
+					// OK SVG (green)
+					`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>` +
 					`</span> <span class='status-text'>no</span></td>`
 			}
 			html += "</tr>"
