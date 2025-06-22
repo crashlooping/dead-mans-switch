@@ -11,6 +11,9 @@ timeout_seconds: 5
 notification_channels:
   - type: dummy
     to: "a@b.com"
+notification_messages:
+  timeout: "Timeout for {{name}}!"
+  recovery: "Recovery for {{name}}!"
 `), 0644); err != nil {
 		t.Fatalf("failed to write test.yaml: %v", err)
 	}
@@ -29,6 +32,12 @@ notification_channels:
 	}
 	if cfg.NotificationChannels[0].Properties["to"] != "a@b.com" {
 		t.Errorf("notification channel property not loaded")
+	}
+	if cfg.NotificationMessages.Timeout != "Timeout for {{name}}!" {
+		t.Errorf("notification_messages.timeout not loaded")
+	}
+	if cfg.NotificationMessages.Recovery != "Recovery for {{name}}!" {
+		t.Errorf("notification_messages.recovery not loaded")
 	}
 	if err := os.Remove("test.yaml"); err != nil {
 		t.Errorf("os.Remove error: %v", err)

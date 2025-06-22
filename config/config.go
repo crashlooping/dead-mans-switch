@@ -13,10 +13,16 @@ type NotificationChannel struct {
 	Properties map[string]string `yaml:",inline"`
 }
 
+type NotificationMessages struct {
+	Timeout  string `yaml:"timeout" envconfig:"NOTIFY_TIMEOUT_MSG"`
+	Recovery string `yaml:"recovery" envconfig:"NOTIFY_RECOVERY_MSG"`
+}
+
 type Config struct {
 	ListenAddr           string                `yaml:"listen_addr" envconfig:"LISTEN_ADDR"`
 	TimeoutSeconds       int                   `yaml:"timeout_seconds" envconfig:"TIMEOUT_SECONDS"`
 	NotificationChannels []NotificationChannel `yaml:"notification_channels"`
+	NotificationMessages NotificationMessages  `yaml:"notification_messages"`
 }
 
 func LoadConfig(path string) (*Config, error) {

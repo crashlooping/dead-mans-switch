@@ -36,9 +36,15 @@ notification_channels:
     chat_id: "-123456789"
   - type: dummy
     to: "test@example.com"
+notification_messages:
+  timeout: "No heartbeat from {{name}}! Last seen {{duration}} ago. Please check the device."
+  recovery: "Device {{name}} has recovered and is sending heartbeats again."
 ```
 
-You can override any config value with environment variables (e.g., `LISTEN_ADDR`, `TIMEOUT_SECONDS`).
+You can override any config value with environment variables (e.g., `LISTEN_ADDR`, `TIMEOUT_SECONDS`):
+
+- `notification_messages.timeout`: Message sent when a device times out. Supports `{{name}}` and `{{duration}}` variables.
+- `notification_messages.recovery`: Message sent when a device recovers. Supports `{{name}}` variable.
 
 ### 2. Running the Server
 

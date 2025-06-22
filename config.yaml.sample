@@ -14,3 +14,6 @@ notification_channels:
     chat_id: "-123456789"
   - type: dummy # Dummy channel for testing, does not send notifications
     to: "test@example.com"
+notification_messages:
+  timeout: "No heartbeat from {{name}}! Last seen {{duration}} ago. Please check the device."
+  recovery: "Device {{name}} has recovered and is sending heartbeats again."

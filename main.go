@@ -39,7 +39,12 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 			duration := time.Since(ch.Timestamp).Round(time.Second)
 			durStr := formatDuration(duration)
 			if missed && !ch.Missing {
-				msg := "No heartbeat received in time from client: " + name + ". Last update was " + durStr + " ago."
+				msg := cfg.NotificationMessages.Timeout
+				if msg == "" {
+					msg = "No heartbeat received in time from client: {{name}}. Last update was {{duration}} ago."
+				}
+				msg = strings.ReplaceAll(msg, "{{name}}", name)
+				msg = strings.ReplaceAll(msg, "{{duration}}", durStr)
 				for _, n := range notifiers {
 					if err := n.Notify("Dead Man's Switch Triggered", msg); err != nil {
 						log.Printf("Notify error: %v", err)
@@ -50,7 +55,11 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 				}
 				broadcastDeviceTable() // update SSE clients on timeout
 			} else if !missed && ch.Missing {
-				msg := "Heartbeat received again from client: " + name
+				msg := cfg.NotificationMessages.Recovery
+				if msg == "" {
+					msg = "Heartbeat received again from client: {{name}}"
+				}
+				msg = strings.ReplaceAll(msg, "{{name}}", name)
 				for _, n := range notifiers {
 					if err := n.Notify("Dead Man's Switch Recovery", msg); err != nil {
 						log.Printf("Notify error: %v", err)
