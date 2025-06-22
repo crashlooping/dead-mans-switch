@@ -2,6 +2,8 @@
 
 A Go-based tool that monitors for regular HTTP POST updates from another application. If updates stop, it sends notifications via configurable channels (email/SMTP, Telegram, dummy, etc.).
 
+![Dead Man's Switch Web UI Screenshot](screenshot-01.png)
+
 ## Features
 
 - Monitors HTTP POST updates from clients
