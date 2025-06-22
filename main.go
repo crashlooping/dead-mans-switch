@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -261,8 +262,17 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	})
 
 	mux.HandleFunc(basePath+"/web", func(w http.ResponseWriter, r *http.Request) {
-		// Serve static index.html
-		http.ServeFile(w, r, "web/index.html")
+		// Inject basePath into the HTML as a data attribute
+		index, err := os.ReadFile("web/index.html")
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("index.html not found"))
+			return
+		}
+		// Insert data-base-path attribute into <body>
+		html := strings.Replace(string(index), "<body>", "<body data-base-path='"+basePath+"'>", 1)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(html))
 	})
 
 	mux.HandleFunc(basePath+"/web/devices", func(w http.ResponseWriter, r *http.Request) {
