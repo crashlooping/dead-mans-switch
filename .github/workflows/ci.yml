@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  release:
+    types: [ published ]
 
 jobs:
   lint-test:
@@ -68,5 +70,27 @@ jobs:
       - name: Build and push multi-arch Docker image
         run: |
           docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
-            -t ghcr.io/${{ github.repository }}:latest \
+            -t ghcr.io/${{ github.repository }}/dead-mans-switch:latest \
             --push .
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./build-artifacts
+      - name: Archive binaries
+        run: |
+          mkdir -p ./build-artifacts
+          cp dead-mans-switch-linux-amd64 ./build-artifacts/ || true
+          cp dead-mans-switch-linux-arm64 ./build-artifacts/ || true
+          cp dead-mans-switch-linux-arm ./build-artifacts/ || true
+          cp dead-mans-switch-windows-amd64.exe ./build-artifacts/ || true
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./build-artifacts/**/*

@@ -178,4 +178,6 @@ You can use this endpoint for monitoring and readiness/liveness checks in Docker
 
 ---
 
+*This project was built and iteratively improved with the help of GitHub Copilot.*
+
 For more details, see inline comments, the [web frontend](web/index.html), and [GitHub](https://github.com/crashlooping/dead-mans-switch/).
