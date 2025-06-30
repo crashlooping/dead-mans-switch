@@ -26,7 +26,12 @@ var (
 )
 
 func monitor(cfg *config.Config, notifiers []notify.Notifier) {
-	ticker := time.NewTicker(time.Second * 5)
+	// Wait until the next minute boundary (0 seconds)
+	now := time.Now()
+	nextMinute := now.Truncate(time.Minute).Add(time.Minute)
+	time.Sleep(time.Until(nextMinute))
+
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
 		heartbeats, err := dbInstance.GetAllHeartbeats()
@@ -132,7 +137,36 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
-	log.Printf("Config loaded: listen_addr=%s, timeout_seconds=%d, notification_channels=%v", cfg.ListenAddr, cfg.TimeoutSeconds, cfg.NotificationChannels)
+
+	// Validate timeout_seconds is at least 60
+	if cfg.TimeoutSeconds < 60 {
+		log.Fatalf("timeout_seconds must be at least 60 seconds, got %d", cfg.TimeoutSeconds)
+	}
+
+	// Create a masked copy of notification channels for logging
+	maskedChannels := make([]config.NotificationChannel, len(cfg.NotificationChannels))
+	for i, ch := range cfg.NotificationChannels {
+		maskedChannels[i] = config.NotificationChannel{
+			Type:       ch.Type,
+			Properties: make(map[string]string),
+		}
+		for k, v := range ch.Properties {
+			switch k {
+			case "bot_token":
+				if len(v) > 6 {
+					maskedChannels[i].Properties[k] = v[:3] + "***" + v[len(v)-3:]
+				} else {
+					maskedChannels[i].Properties[k] = "***"
+				}
+			case "smtp_pass":
+				maskedChannels[i].Properties[k] = "***"
+			default:
+				maskedChannels[i].Properties[k] = v
+			}
+		}
+	}
+
+	log.Printf("Config loaded: listen_addr=%s, timeout_seconds=%d, notification_channels=%v", cfg.ListenAddr, cfg.TimeoutSeconds, maskedChannels)
 	dbPath := "data/heartbeats.db"
 	if os.Getenv("HEARTBEAT_DB_PATH") != "" {
 		dbPath = os.Getenv("HEARTBEAT_DB_PATH")

@@ -1,5 +1,5 @@
 listen_addr: ":8080" # Address to listen on, e.g., ":8080" for all interfaces or "
-timeout_seconds: 180 # Timeout in seconds before the switch is triggered
+timeout_seconds: 180 # Timeout in seconds (>60) before the switch is triggered
 notification_channels:
   - type: smtp
     to: "user@example.com"

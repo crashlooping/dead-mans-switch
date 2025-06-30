@@ -23,7 +23,7 @@ Create a `config.yaml` file in the working directory. Example:
 
 ```yaml
 listen_addr: ":8080"
-timeout_seconds: 600
+timeout_seconds: 600           # timeout in seconds (>60)
 notification_channels:
   - type: smtp
     to: "user@example.com"
