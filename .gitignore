@@ -8,6 +8,9 @@
 /build/
 /bin/
 
+# Build scripts
+build.ps1
+
 # VSCode
 .vscode/
 

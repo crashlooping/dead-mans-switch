@@ -3,7 +3,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o dead-mans-switch .
+# Build with metadata
+ARG BUILD_TIME
+ARG GIT_COMMIT
+RUN go build -ldflags "-X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" -o dead-mans-switch .
 
 FROM docker.io/library/alpine:3
 WORKDIR /app

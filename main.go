@@ -25,6 +25,9 @@ var (
 	sseMu       sync.Mutex
 )
 
+var BuildTime = "dev"
+var GitCommit = "none"
+
 func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 	// Wait until the next minute boundary (0 seconds)
 	now := time.Now()
@@ -167,6 +170,10 @@ func main() {
 	}
 
 	log.Printf("Config loaded: listen_addr=%s, timeout_seconds=%d, notification_channels=%v", cfg.ListenAddr, cfg.TimeoutSeconds, maskedChannels)
+
+	// Log build metadata
+	log.Printf("Build Time: %s, Git Commit: %s", BuildTime, GitCommit)
+
 	dbPath := "data/heartbeats.db"
 	if os.Getenv("HEARTBEAT_DB_PATH") != "" {
 		dbPath = os.Getenv("HEARTBEAT_DB_PATH")
@@ -317,15 +324,15 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	})
 
 	mux.HandleFunc(basePath+"/web", func(w http.ResponseWriter, r *http.Request) {
-		// Inject basePath into the HTML as a data attribute
+		// Inject basePath, build metadata into the HTML as data attributes on <body>
 		index, err := os.ReadFile("web/index.html")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte("index.html not found"))
 			return
 		}
-		// Insert data-base-path attribute into <body>
-		html := strings.Replace(string(index), "<body>", "<body data-base-path='"+basePath+"'>", 1)
+		// Insert data attributes
+		html := strings.Replace(string(index), "<body>", fmt.Sprintf("<body data-base-path='%s' data-build-time='%s' data-git-commit='%s'>", basePath, BuildTime, GitCommit), 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(html))
 	})
@@ -381,10 +388,28 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		if err == nil {
 			lines := strings.Split(string(content), "\n")
 			for i, line := range lines {
-				if strings.Contains(line, "pass:") || strings.Contains(line, "token:") || strings.Contains(line, "bot_token:") {
+				if strings.Contains(line, "bot_token:") {
 					parts := strings.SplitN(line, ":", 2)
 					if len(parts) == 2 {
-						lines[i] = parts[0] + ": **********"
+						value := strings.TrimSpace(parts[1])
+						// Check if value is quoted and extract the actual token
+						if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) && len(value) > 2 {
+							token := value[1 : len(value)-1] // Remove quotes
+							if len(token) > 6 {
+								lines[i] = parts[0] + `: "` + token[:3] + "***" + token[len(token)-3:] + `"`
+							} else {
+								lines[i] = parts[0] + `: "***"`
+							}
+						} else if len(value) > 6 {
+							lines[i] = parts[0] + ": " + value[:3] + "***" + value[len(value)-3:]
+						} else {
+							lines[i] = parts[0] + ": ***"
+						}
+					}
+				} else if strings.Contains(line, "pass:") || strings.Contains(line, "token:") {
+					parts := strings.SplitN(line, ":", 2)
+					if len(parts) == 2 {
+						lines[i] = parts[0] + ": ***"
 					}
 				}
 			}
@@ -397,9 +422,15 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		// fallback: show as JSON with masked secrets
 		masked := cfg
 		for i := range masked.NotificationChannels {
-			for k := range masked.NotificationChannels[i].Properties {
-				if strings.Contains(k, "pass") || strings.Contains(k, "token") || strings.Contains(k, "secret") {
-					masked.NotificationChannels[i].Properties[k] = "**********"
+			for k, v := range masked.NotificationChannels[i].Properties {
+				if k == "bot_token" {
+					if len(v) > 6 {
+						masked.NotificationChannels[i].Properties[k] = v[:3] + "***" + v[len(v)-3:]
+					} else {
+						masked.NotificationChannels[i].Properties[k] = "***"
+					}
+				} else if strings.Contains(k, "pass") || strings.Contains(k, "token") || strings.Contains(k, "secret") {
+					masked.NotificationChannels[i].Properties[k] = "***"
 				}
 			}
 		}

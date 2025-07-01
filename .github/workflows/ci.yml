@@ -46,11 +46,18 @@ jobs:
         with:
           go-version: 'stable'
       - name: Build
+        env:
+          BUILD_TIME: ${{ github.event.head_commit.timestamp || 'unknown' }}
+          GIT_COMMIT: ${{ github.sha }}
         run: |
           if [ "$GOOS" = "windows" ]; then \
-            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }}.exe .; \
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+              -ldflags "-X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT:0:7}" \
+              -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }}.exe .; \
           else \
-            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }} .; \
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+              -ldflags "-X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT:0:7}" \
+              -o dead-mans-switch-${{ matrix.goos }}-${{ matrix.goarch }} .; \
           fi
 
   docker:
@@ -69,8 +76,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
       - name: Build and push multi-arch Docker image
+        env:
+          BUILD_TIME: ${{ github.event.head_commit.timestamp || 'unknown' }}
+          GIT_COMMIT: ${{ github.sha }}
         run: |
           docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
+            --build-arg BUILD_TIME="${BUILD_TIME}" \
+            --build-arg GIT_COMMIT="${GIT_COMMIT:0:7}" \
             -t ghcr.io/${{ github.repository }}/dead-mans-switch:latest \
             --push .
 

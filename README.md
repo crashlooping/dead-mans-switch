@@ -60,13 +60,53 @@ GOOS=windows GOARCH=amd64 go build -o build/dead-mans-switch-windows-amd64.exe .
 ./build/dead-mans-switch-linux-amd64 # or the appropriate binary for your OS
 ```
 
+To include build metadata (build time and git commit) in the binary:
+
+```sh
+BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT=$(git rev-parse --short HEAD)
+go build -ldflags "-X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" -o dead-mans-switch .
+```
+
 All local build artifacts are written to the `/build` directory.
 
 #### Docker
 
+**Bash:**
+
 ```sh
-docker build -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
+# Build with metadata
+docker build \
+  --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --build-arg GIT_COMMIT="$(git rev-parse --short HEAD)" \
+  -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
+
+# Run
 docker run -v $(pwd)/config.yaml:/app/config.yaml -p 8080:8080 ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
+```
+
+**PowerShell:**
+
+```powershell
+# Build with metadata
+docker build `
+  --build-arg BUILD_TIME="$(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)" `
+  --build-arg GIT_COMMIT="$(git rev-parse --short HEAD)" `
+  -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
+
+# Run
+docker run -v "${PWD}/config.yaml:/app/config.yaml" -p 8080:8080 ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
+```
+
+**Windows CMD:**
+
+```cmd
+REM Build with metadata (requires Git for Windows)
+for /f %%i in ('git rev-parse --short HEAD') do set GIT_COMMIT=%%i
+docker build --build-arg BUILD_TIME="%date:~10,4%-%date:~4,2%-%date:~7,2%T%time:~0,8%Z" --build-arg GIT_COMMIT="%GIT_COMMIT%" -t ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest .
+
+REM Run
+docker run -v "%cd%/config.yaml:/app/config.yaml" -p 8080:8080 ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
 ```
 
 #### Docker (plain)
@@ -124,6 +164,7 @@ Visit [http://localhost:8080/](http://localhost:8080/) in your browser to view:
 
 - A live-updating table of all device heartbeats and status
 - A list of all configured notification channels (with sensitive fields masked)
+- Build information (build time and git commit) in the footer
 - A link to the GitHub repository
 
 The frontend is built with [htmx](https://htmx.org/) and [Water.css](https://watercss.kognise.dev/) for a modern, minimal look.
@@ -183,9 +224,10 @@ services:
 
 ## Building and CI/CD
 
-- Binaries for Windows (x64) and Linux (x64, ARM) are built via GitHub Actions.
+- Binaries for Windows (x64) and Linux (x64, ARM) are built via GitHub Actions with embedded build metadata (build time and git commit).
 - Docker images are built and pushed to the GitHub Container Registry for all major platforms.
 - Multi-arch Docker images are available under the `:latest` tag.
+- Build metadata is displayed in the web UI footer and logged during startup for version tracking.
 
 ## Extending Notifications
 
