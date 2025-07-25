@@ -24,6 +24,7 @@ Create a `config.yaml` file in the working directory. Example:
 ```yaml
 listen_addr: ":8080"
 timeout_seconds: 600           # timeout in seconds (>60)
+invert: false                  # if true, shows "Available" instead of "Missing" with inverted yes/no logic
 notification_channels:
   - type: smtp
     to: "user@example.com"
@@ -47,8 +48,33 @@ You can override any config value with environment variables (e.g., `LISTEN_ADDR
 
 - `notification_messages.timeout`: Message sent when a device times out. Supports `{{name}}` and `{{duration}}` variables.
 - `notification_messages.recovery`: Message sent when a device recovers. Supports `{{name}}` variable.
+- `invert`: If set to `true`, the web interface will show "Available" instead of "Missing" in the status column, with inverted yes/no logic:
+  - **Normal mode** (`invert: false`): "Missing" column, "yes" = missing (red), "no" = not missing (green)
+  - **Inverted mode** (`invert: true`): "Available" column, "yes" = available (green), "no" = not available (red)
 
 ### 2. Running the Server
+
+#### Development (go run)
+
+For local development and testing, you can run the tool directly with Go:
+
+```sh
+# Run with default config.yaml in current directory
+go run .
+
+# Or with custom config path
+HEARTBEAT_DB_PATH=./test-data/heartbeats.db go run . 
+
+# With environment variable overrides
+LISTEN_ADDR=":9090" TIMEOUT_SECONDS=300 go run .
+```
+
+This will:
+
+- Look for `config.yaml` in the current directory
+- Start the server on the configured listen address (default `:8080`)
+- Create a `data/` directory and `heartbeats.db` file for persistent storage
+- Display build metadata as "dev" and "none" since no build flags are used
 
 #### Native (Windows/Linux)
 

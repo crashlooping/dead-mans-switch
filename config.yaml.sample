@@ -1,5 +1,6 @@
-listen_addr: ":8080" # Address to listen on, e.g., ":8080" for all interfaces or "
+listen_addr: ":8080" # Address to listen on, e.g., ":8080" for all interfaces or "localhost:8080"
 timeout_seconds: 180 # Timeout in seconds (>60) before the switch is triggered
+invert: false # If true, shows "Available" instead of "Missing" with inverted yes/no logic
 notification_channels:
   - type: smtp
     to: "user@example.com"

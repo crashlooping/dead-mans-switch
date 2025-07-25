@@ -61,7 +61,7 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 				if err := dbInstance.SetMissing(name, true); err != nil {
 					log.Printf("SetMissing error: %v", err)
 				}
-				broadcastDeviceTable() // update SSE clients on timeout
+				broadcastDeviceTable(cfg) // update SSE clients on timeout
 			} else if !missed && ch.Missing {
 				msg := cfg.NotificationMessages.Recovery
 				if msg == "" {
@@ -76,7 +76,7 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 				if err := dbInstance.SetMissing(name, false); err != nil {
 					log.Printf("SetMissing error: %v", err)
 				}
-				broadcastDeviceTable() // update SSE clients on recovery
+				broadcastDeviceTable(cfg) // update SSE clients on recovery
 			}
 		}
 	}
@@ -93,7 +93,7 @@ func setupNotifiers(cfg *config.Config) []notify.Notifier {
 	return result
 }
 
-func broadcastDeviceTable() {
+func broadcastDeviceTable(cfg *config.Config) {
 	heartbeats, err := dbInstance.GetAllHeartbeats()
 	if err != nil {
 		return
@@ -104,23 +104,56 @@ func broadcastDeviceTable() {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>Missing</th></tr></thead><tbody>`
+
+	// Determine column header based on invert setting
+	columnHeader := "Missing"
+	if cfg.Invert {
+		columnHeader = "Available"
+	}
+
+	html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>` + columnHeader + `</th></tr></thead><tbody>`
 	for _, name := range names {
 		ch := heartbeats[name]
 		html += "<tr>"
 		html += "<td>" + name + "</td>"
 		html += `<td data-utc='` + ch.Timestamp.UTC().Format(time.RFC3339) + `'>` + ch.Timestamp.UTC().Format(time.RFC3339) + "</td>"
-		if ch.Missing {
-			html += `<td class='status status-yes'><span class='status-icon' aria-label='Missing' title='Missing'>` +
-				// Not OK SVG (red)
-				`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>` +
-				`</span> <span class='status-text'>yes</span></td>`
+
+		// Determine display values based on invert setting
+		var displayValue, statusClass, iconTitle, svgIcon string
+
+		if cfg.Invert {
+			// Inverted logic: Available column
+			if ch.Missing {
+				// Device is missing = not available
+				displayValue = "no"
+				statusClass = "status-yes" // Red styling (bad state)
+				iconTitle = "Not Available"
+				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
+			} else {
+				// Device is not missing = available
+				displayValue = "yes"
+				statusClass = "status-no" // Green styling (good state)
+				iconTitle = "Available"
+				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
+			}
 		} else {
-			html += `<td class='status status-no'><span class='status-icon' aria-label='OK' title='OK'>` +
-				// OK SVG (green)
-				`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>` +
-				`</span> <span class='status-text'>no</span></td>`
+			// Normal logic: Missing column
+			if ch.Missing {
+				// Device is missing
+				displayValue = "yes"
+				statusClass = "status-yes" // Red styling (bad state)
+				iconTitle = "Missing"
+				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
+			} else {
+				// Device is not missing
+				displayValue = "no"
+				statusClass = "status-no" // Green styling (good state)
+				iconTitle = "OK"
+				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
+			}
 		}
+
+		html += `<td class='` + statusClass + `'><span class='status-icon' aria-label='` + iconTitle + `' title='` + iconTitle + `'>` + svgIcon + `</span> <span class='status-text'>` + displayValue + `</span></td>`
 		html += "</tr>"
 	}
 	html += "</tbody></table>"
@@ -223,23 +256,56 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			names = append(names, name)
 		}
 		sort.Strings(names)
-		html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>Missing</th></tr></thead><tbody>`
+
+		// Determine column header based on invert setting
+		columnHeader := "Missing"
+		if cfg.Invert {
+			columnHeader = "Available"
+		}
+
+		html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>` + columnHeader + `</th></tr></thead><tbody>`
 		for _, name := range names {
 			chb := heartbeats[name]
 			html += "<tr>"
 			html += "<td>" + name + "</td>"
 			html += `<td data-utc='` + chb.Timestamp.UTC().Format(time.RFC3339) + `'>` + chb.Timestamp.UTC().Format(time.RFC3339) + "</td>"
-			if chb.Missing {
-				html += `<td class='status status-yes'><span class='status-icon' aria-label='Missing' title='Missing'>` +
-					// Not OK SVG (red)
-					`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>` +
-					`</span> <span class='status-text'>yes</span></td>`
+
+			// Determine display values based on invert setting
+			var displayValue, statusClass, iconTitle, svgIcon string
+
+			if cfg.Invert {
+				// Inverted logic: Available column
+				if chb.Missing {
+					// Device is missing = not available
+					displayValue = "no"
+					statusClass = "status-yes" // Red styling (bad state)
+					iconTitle = "Not Available"
+					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
+				} else {
+					// Device is not missing = available
+					displayValue = "yes"
+					statusClass = "status-no" // Green styling (good state)
+					iconTitle = "Available"
+					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
+				}
 			} else {
-				html += `<td class='status status-no'><span class='status-icon' aria-label='OK' title='OK'>` +
-					// OK SVG (green)
-					`<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>` +
-					`</span> <span class='status-text'>no</span></td>`
+				// Normal logic: Missing column
+				if chb.Missing {
+					// Device is missing
+					displayValue = "yes"
+					statusClass = "status-yes" // Red styling (bad state)
+					iconTitle = "Missing"
+					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
+				} else {
+					// Device is not missing
+					displayValue = "no"
+					statusClass = "status-no" // Green styling (good state)
+					iconTitle = "OK"
+					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
+				}
 			}
+
+			html += `<td class='` + statusClass + `'><span class='status-icon' aria-label='` + iconTitle + `' title='` + iconTitle + `'>` + svgIcon + `</span> <span class='status-text'>` + displayValue + `</span></td>`
 			html += "</tr>"
 		}
 		html += "</tbody></table>"
@@ -288,7 +354,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			log.Printf("DB update error for %s: %v", body.Name, err)
 		} else {
 			log.Printf("Stored to DB: {name: %s, timestamp: %s}", body.Name, now.Format(time.RFC3339))
-			broadcastDeviceTable()
+			broadcastDeviceTable(cfg)
 		}
 		if wasMissing {
 			msg := "Heartbeat received again from client: " + body.Name

@@ -21,6 +21,7 @@ type NotificationMessages struct {
 type Config struct {
 	ListenAddr           string                `yaml:"listen_addr" envconfig:"LISTEN_ADDR"`
 	TimeoutSeconds       int                   `yaml:"timeout_seconds" envconfig:"TIMEOUT_SECONDS"`
+	Invert               bool                  `yaml:"invert" envconfig:"INVERT"`
 	NotificationChannels []NotificationChannel `yaml:"notification_channels"`
 	NotificationMessages NotificationMessages  `yaml:"notification_messages"`
 }
