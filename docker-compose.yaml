@@ -2,11 +2,10 @@ services:
   dead-mans-switch:
     image: ghcr.io/crashlooping/dead-mans-switch/dead-mans-switch:latest
     container_name: dead-mans-switch
-    environment:
-      - TZ=Europe/Berlin
     ports:
       - "8080:8080"
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro # Configuration file
+      - ./data:/app/data # Persistent data storage
+      - /etc/localtime:/etc/localtime:ro # Set timezone from host
     restart: unless-stopped
