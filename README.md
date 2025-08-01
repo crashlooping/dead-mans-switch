@@ -40,7 +40,7 @@ notification_channels:
   - type: dummy
     to: "test@example.com"
 notification_messages:
-  timeout: "No heartbeat from {{name}}! Last seen {{duration}} ago. Please check the device."
+  timeout: "No heartbeat from {{name}}! Last seen {{duration}} ago at {{timestamp}}. Please check the device."
   recovery: "Device {{name}} has recovered and is sending heartbeats again."
 ```
 

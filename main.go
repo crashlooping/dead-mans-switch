@@ -49,10 +49,11 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 			if missed && !ch.Missing {
 				msg := cfg.NotificationMessages.Timeout
 				if msg == "" {
-					msg = "No heartbeat received in time from client: {{name}}. Last update was {{duration}} ago."
+					msg = "No heartbeat received in time from client: {{name}}. Last update was {{duration}} ago at {{timestamp}}."
 				}
 				msg = strings.ReplaceAll(msg, "{{name}}", name)
 				msg = strings.ReplaceAll(msg, "{{duration}}", durStr)
+				msg = strings.ReplaceAll(msg, "{{timestamp}}", ch.Timestamp.Format(time.RFC3339))
 				for _, n := range notifiers {
 					if err := n.Notify("Dead Man's Switch Triggered", msg); err != nil {
 						log.Printf("Notify error: %v", err)
