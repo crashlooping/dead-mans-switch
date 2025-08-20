@@ -6,7 +6,7 @@ require (
 	github.com/jordan-wright/email v4.0.1-0.20210109023952-943e75fe5223+incompatible
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nikoksr/notify v1.3.0
-	go.etcd.io/bbolt v1.4.2
+	go.etcd.io/bbolt v1.4.3
 	gopkg.in/yaml.v3 v3.0.1
 )
 
