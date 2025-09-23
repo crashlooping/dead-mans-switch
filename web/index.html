@@ -175,7 +175,10 @@
                 if (utc) {
                     const d = new Date(utc);
                     if (!isNaN(d)) {
-                        cell.textContent = d.toLocaleString();
+                        // Format: DD.MM.YYYY, HH:MM:SS with leading zeros
+                        const z = (n) => String(n).padStart(2, '0');
+                        const formatted = `${z(d.getDate())}.${z(d.getMonth() + 1)}.${d.getFullYear()}, ${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
+                        cell.textContent = formatted;
                     }
                 }
             });
