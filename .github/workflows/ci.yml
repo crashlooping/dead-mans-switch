@@ -7,6 +7,9 @@ on:
     branches: [ main ]
   release:
     types: [ published ]
+  schedule:
+    # Runs weekly on Sunday at 15:00 UTC. GitHub Actions uses UTC for cron schedules.
+    - cron: '0 15 * * 0'
 
 jobs:
   lint-test:
