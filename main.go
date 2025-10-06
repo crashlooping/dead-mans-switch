@@ -205,6 +205,15 @@ func main() {
 
 	log.Printf("Config loaded: listen_addr=%s, timeout_seconds=%d, notification_channels=%v", cfg.ListenAddr, cfg.TimeoutSeconds, maskedChannels)
 
+	// If build metadata wasn't embedded at compile time (e.g. older artifacts or certain CI events),
+	// fall back to the current UTC time so the web UI shows a useful timestamp instead of 'unknown'.
+	if BuildTime == "" || BuildTime == "dev" || strings.ToLower(BuildTime) == "unknown" {
+		BuildTime = time.Now().UTC().Format(time.RFC3339)
+	}
+	if GitCommit == "" || GitCommit == "none" || strings.ToLower(GitCommit) == "unknown" {
+		GitCommit = "local"
+	}
+
 	// Log build metadata
 	log.Printf("Build Time: %s, Git Commit: %s", BuildTime, GitCommit)
 

@@ -49,10 +49,16 @@ jobs:
         with:
           go-version: 'stable'
       - name: Build
+        # Only set GIT_COMMIT via workflow expression; compute BUILD_TIME in the shell so scheduled runs get a real timestamp
         env:
-          BUILD_TIME: ${{ github.event.head_commit.timestamp || 'unknown' }}
           GIT_COMMIT: ${{ github.sha }}
+          BUILD_TIME_FROM_EVENT: ${{ github.event.head_commit.timestamp }}
         run: |
+          # Prefer the head commit timestamp when available (push), otherwise fall back to current UTC time (e.g. scheduled runs)
+          BUILD_TIME="${BUILD_TIME_FROM_EVENT}"
+          if [ -z "${BUILD_TIME}" ]; then
+            BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          fi
           if [ "$GOOS" = "windows" ]; then \
             GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
               -ldflags "-X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT:0:7}" \
@@ -80,9 +86,13 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       - name: Build and push multi-arch Docker image
         env:
-          BUILD_TIME: ${{ github.event.head_commit.timestamp || 'unknown' }}
           GIT_COMMIT: ${{ github.sha }}
+          BUILD_TIME_FROM_EVENT: ${{ github.event.head_commit.timestamp }}
         run: |
+          BUILD_TIME="${BUILD_TIME_FROM_EVENT}"
+          if [ -z "${BUILD_TIME}" ]; then
+            BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          fi
           docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 \
             --build-arg BUILD_TIME="${BUILD_TIME}" \
             --build-arg GIT_COMMIT="${GIT_COMMIT:0:7}" \
