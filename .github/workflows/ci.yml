@@ -106,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: ./build-artifacts
       - name: Archive binaries
