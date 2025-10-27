@@ -8,6 +8,64 @@
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
     <style>
+    .page-header {
+        display: flex;
+        align-items: center;
+        gap: 1em;
+        margin-bottom: 1em;
+    }
+    .logo {
+        display: inline-block;
+        height: 40px;
+        width: 40px;
+        max-width: 80px;
+    }
+    .logo svg {
+        height: 100%;
+        width: 100%;
+    }
+    .page-title {
+        margin: 0;
+    }
+    .theme-toggle {
+        margin-left: auto;
+        font-size: 1.2em;
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+    .tab-buttons {
+        margin-bottom: 1.5em;
+    }
+    .tab-btn:first-child {
+        margin-right: 1em;
+    }
+    .config-tab {
+        display: none;
+    }
+    .config-tab.visible {
+        display: block;
+    }
+    .page-footer {
+        margin-top: 2em;
+        text-align: center;
+    }
+    .github-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5em;
+    }
+    .github-text {
+        display: none;
+    }
+    .github-text.visible {
+        display: inline;
+    }
+    .build-info {
+        margin-left: 1em;
+        color: var(--text-color, #666);
+        font-size: 0.9em;
+    }
     .tab-btn {
         padding: 0.5em 1.2em;
         border: none;
@@ -127,20 +185,20 @@
     </style>
 </head>
 <body>
-    <header style="display:flex;align-items:center;gap:1em;margin-bottom:1em;">
-        <span aria-hidden="true" style="display:inline-block;height:40px;width:40px;max-width:80px;">
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:100%;width:100%;">
+    <header class="page-header">
+        <span class="logo" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect width="48" height="48" rx="12" fill="#e53e3e"/>
                 <polyline points="8,32 18,32 24,16 30,40 36,24 40,32" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </span>
-        <h1 style="margin:0;">Device Heartbeats</h1>
-        <button id="theme-toggle" aria-label="Toggle dark mode" style="margin-left:auto;font-size:1.2em;background:none;border:none;cursor:pointer;">
+        <h1 class="page-title">Device Heartbeats</h1>
+        <button id="theme-toggle" aria-label="Toggle dark mode" class="theme-toggle">
             <span id="theme-toggle-icon" aria-hidden="true">🌙</span>
         </button>
     </header>
-    <div style="margin-bottom:1.5em;">
-        <button id="tab-devices" class="tab-btn" style="margin-right:1em;">
+    <div class="tab-buttons">
+        <button id="tab-devices" class="tab-btn">
             <span class="icon" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm2 0v10h12V5H4zm2 2h8v2H6V7zm0 4h5v2H6v-2z"/></svg>
             </span>
@@ -157,7 +215,7 @@
         <div id="devices-tab">
             <div id="device-table">Loading device data...</div>
         </div>
-        <div id="config-tab" style="display:none;">
+        <div id="config-tab" class="config-tab">
             <pre id="config-content">Loading config...</pre>
         </div>
     </div>
@@ -201,13 +259,13 @@
     // Tab logic
     document.getElementById('tab-devices').onclick = function() {
         document.getElementById('devices-tab').style.display = '';
-        document.getElementById('config-tab').style.display = 'none';
+        document.getElementById('config-tab').classList.remove('visible');
         this.classList.add('active');
         document.getElementById('tab-config').classList.remove('active');
     };
     document.getElementById('tab-config').onclick = function() {
         document.getElementById('devices-tab').style.display = 'none';
-        document.getElementById('config-tab').style.display = '';
+        document.getElementById('config-tab').classList.add('visible');
         this.classList.add('active');
         document.getElementById('tab-devices').classList.remove('active');
         // Fetch config if not already loaded
@@ -268,11 +326,12 @@
         });
     })();
     </script>
-    <footer style="margin-top:2em;text-align:center;" id="page-footer">
-        <a href="https://github.com/crashlooping/dead-mans-switch/" target="_blank" style="display:inline-flex;align-items:center;gap:0.5em;">
-            <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="vertical-align:middle;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
+    <footer class="page-footer" id="page-footer">
+        <a href="https://github.com/crashlooping/dead-mans-switch/" target="_blank" rel="noopener" title="View on GitHub" class="github-link">
+            <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
+            <span class="github-text">GitHub</span>
         </a>
-        <span id="build-info" style="margin-left:1em;color:var(--text-color, #666);font-size:0.9em;"></span>
+        <span id="build-info" class="build-info"></span>
     </footer>
     <script>
     (function() {
