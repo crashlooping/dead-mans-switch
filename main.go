@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
@@ -94,11 +95,8 @@ func setupNotifiers(cfg *config.Config) []notify.Notifier {
 	return result
 }
 
-func broadcastDeviceTable(cfg *config.Config) {
-	heartbeats, err := dbInstance.GetAllHeartbeats()
-	if err != nil {
-		return
-	}
+// generateDeviceTable creates the device status table HTML
+func generateDeviceTable(cfg *config.Config, heartbeats map[string]db.ClientHeartbeat) string {
 	// Sort device names
 	var names []string
 	for name := range heartbeats {
@@ -112,12 +110,22 @@ func broadcastDeviceTable(cfg *config.Config) {
 		columnHeader = "Available"
 	}
 
-	html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>` + columnHeader + `</th></tr></thead><tbody>`
+	htmlBuilder := strings.Builder{}
+	htmlBuilder.WriteString(`<table><thead><tr><th>Device</th><th>Last Seen</th><th>`)
+	htmlBuilder.WriteString(columnHeader)
+	htmlBuilder.WriteString(`</th></tr></thead><tbody>`)
+
 	for _, name := range names {
 		ch := heartbeats[name]
-		html += "<tr>"
-		html += "<td>" + name + "</td>"
-		html += `<td data-utc='` + ch.Timestamp.UTC().Format(time.RFC3339) + `'>` + ch.Timestamp.UTC().Format(time.RFC3339) + "</td>"
+		escapedName := html.EscapeString(name)
+
+		htmlBuilder.WriteString("<tr><td>")
+		htmlBuilder.WriteString(escapedName)
+		htmlBuilder.WriteString(`</td><td data-utc='`)
+		htmlBuilder.WriteString(ch.Timestamp.UTC().Format(time.RFC3339))
+		htmlBuilder.WriteString(`'>`)
+		htmlBuilder.WriteString(ch.Timestamp.UTC().Format(time.RFC3339))
+		htmlBuilder.WriteString("</td>")
 
 		// Determine display values based on invert setting
 		var displayValue, statusClass, iconTitle, svgIcon string
@@ -154,15 +162,36 @@ func broadcastDeviceTable(cfg *config.Config) {
 			}
 		}
 
-		html += `<td class='` + statusClass + `'><span class='status-icon' aria-label='` + iconTitle + `' title='` + iconTitle + `'>` + svgIcon + `</span> <span class='status-text'>` + displayValue + `</span></td>`
-		html += "</tr>"
+		htmlBuilder.WriteString(`<td class='`)
+		htmlBuilder.WriteString(statusClass)
+		htmlBuilder.WriteString(`'><span class='status-icon' aria-label='`)
+		htmlBuilder.WriteString(iconTitle)
+		htmlBuilder.WriteString(`' title='`)
+		htmlBuilder.WriteString(iconTitle)
+		htmlBuilder.WriteString(`'>`)
+		htmlBuilder.WriteString(svgIcon)
+		htmlBuilder.WriteString(`</span> <span class='status-text'>`)
+		htmlBuilder.WriteString(displayValue)
+		htmlBuilder.WriteString(`</span></td></tr>`)
 	}
-	html += "</tbody></table>"
+
+	htmlBuilder.WriteString("</tbody></table>")
+	return htmlBuilder.String()
+}
+
+func broadcastDeviceTable(cfg *config.Config) {
+	heartbeats, err := dbInstance.GetAllHeartbeats()
+	if err != nil {
+		log.Printf("Failed to get heartbeats for broadcast: %v", err)
+		return
+	}
+
+	tableHTML := generateDeviceTable(cfg, heartbeats)
 
 	sseMu.Lock()
 	for ch := range sseClients {
 		select {
-		case ch <- html:
+		case ch <- tableHTML:
 		default:
 		}
 	}
@@ -260,66 +289,15 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			close(ch)
 		}()
 		// Send initial table
-		heartbeats, _ := dbInstance.GetAllHeartbeats()
-		var names []string
-		for name := range heartbeats {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-
-		// Determine column header based on invert setting
-		columnHeader := "Missing"
-		if cfg.Invert {
-			columnHeader = "Available"
+		heartbeats, err := dbInstance.GetAllHeartbeats()
+		if err != nil {
+			log.Printf("Failed to get heartbeats for SSE: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 
-		html := `<table><thead><tr><th>Device</th><th>Last Seen</th><th>` + columnHeader + `</th></tr></thead><tbody>`
-		for _, name := range names {
-			chb := heartbeats[name]
-			html += "<tr>"
-			html += "<td>" + name + "</td>"
-			html += `<td data-utc='` + chb.Timestamp.UTC().Format(time.RFC3339) + `'>` + chb.Timestamp.UTC().Format(time.RFC3339) + "</td>"
-
-			// Determine display values based on invert setting
-			var displayValue, statusClass, iconTitle, svgIcon string
-
-			if cfg.Invert {
-				// Inverted logic: Available column
-				if chb.Missing {
-					// Device is missing = not available
-					displayValue = "no"
-					statusClass = "status-yes" // Red styling (bad state)
-					iconTitle = "Not Available"
-					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
-				} else {
-					// Device is not missing = available
-					displayValue = "yes"
-					statusClass = "status-no" // Green styling (good state)
-					iconTitle = "Available"
-					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
-				}
-			} else {
-				// Normal logic: Missing column
-				if chb.Missing {
-					// Device is missing
-					displayValue = "yes"
-					statusClass = "status-yes" // Red styling (bad state)
-					iconTitle = "Missing"
-					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
-				} else {
-					// Device is not missing
-					displayValue = "no"
-					statusClass = "status-no" // Green styling (good state)
-					iconTitle = "OK"
-					svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
-				}
-			}
-
-			html += `<td class='` + statusClass + `'><span class='status-icon' aria-label='` + iconTitle + `' title='` + iconTitle + `'>` + svgIcon + `</span> <span class='status-text'>` + displayValue + `</span></td>`
-			html += "</tr>"
-		}
-		html += "</tbody></table>"
-		if _, err := fmt.Fprintf(w, "data: %s\n\n", html); err != nil {
+		tableHTML := generateDeviceTable(cfg, heartbeats)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", tableHTML); err != nil {
 			log.Printf("Fprintf error: %v", err)
 		}
 		w.(http.Flusher).Flush()
@@ -348,13 +326,18 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil || body.Name == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte("Missing or invalid 'name' in body"))
+			if _, err := w.Write([]byte("Missing or invalid 'name' in body")); err != nil {
+				log.Printf("Write error: %v", err)
+			}
 			return
 		}
 		log.Printf("Received heartbeat from client: %s", body.Name)
 		now := time.Now()
 		// Check if client was missing before updating
-		heartbeats, _ := dbInstance.GetAllHeartbeats()
+		heartbeats, err := dbInstance.GetAllHeartbeats()
+		if err != nil {
+			log.Printf("DB error getting heartbeats: %v", err)
+		}
 		wasMissing := false
 		if ch, ok := heartbeats[body.Name]; ok {
 			wasMissing = ch.Missing
@@ -377,9 +360,15 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 				log.Printf("SetMissing error: %v", err)
 			}
 		}
-		clientState[body.Name] = false // mark as healthy on any heartbeat
+		// Mark as healthy with proper synchronization
+		sseMu.Lock()
+		clientState[body.Name] = false
+		sseMu.Unlock()
+
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			log.Printf("Write error: %v", err)
+		}
 	})
 
 	mux.HandleFunc(basePath+"/heartbeats", func(w http.ResponseWriter, r *http.Request) {
@@ -404,23 +393,31 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		index, err := os.ReadFile("web/index.html")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("index.html not found"))
+			if _, err := w.Write([]byte("index.html not found")); err != nil {
+				log.Printf("Write error: %v", err)
+			}
 			return
 		}
 		// Insert data attributes
-		html := strings.Replace(string(index), "<body>", fmt.Sprintf("<body data-base-path='%s' data-build-time='%s' data-git-commit='%s'>", basePath, BuildTime, GitCommit), 1)
+		htmlContent := strings.Replace(string(index), "<body>", fmt.Sprintf("<body data-base-path='%s' data-build-time='%s' data-git-commit='%s'>", basePath, BuildTime, GitCommit), 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(html))
+		if _, err := w.Write([]byte(htmlContent)); err != nil {
+			log.Printf("Write error: %v", err)
+		}
 	})
 
 	mux.HandleFunc(basePath+"/web/devices", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<div id='device-table'></div>`)) // placeholder, SSE will update
+		if _, err := w.Write([]byte(`<div id='device-table'></div>`)); err != nil {
+			log.Printf("Write error: %v", err)
+		}
 	})
 
 	mux.HandleFunc(basePath+"/web/configured-notifications", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<ul>`))
+		if _, err := w.Write([]byte(`<ul>`)); err != nil {
+			log.Printf("Write error: %v", err)
+		}
 		// Sort notification channels by type
 		notifs := make([]config.NotificationChannel, len(cfg.NotificationChannels))
 		copy(notifs, cfg.NotificationChannels)
@@ -428,9 +425,13 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			return notifs[i].Type < notifs[j].Type
 		})
 		for _, ch := range notifs {
-			_, _ = w.Write([]byte("<li><b>" + ch.Type + "</b>"))
+			if _, err := w.Write([]byte("<li><b>" + ch.Type + "</b>")); err != nil {
+				log.Printf("Write error: %v", err)
+			}
 			if len(ch.Properties) > 0 {
-				_, _ = w.Write([]byte(": <code>"))
+				if _, err := w.Write([]byte(": <code>")); err != nil {
+					log.Printf("Write error: %v", err)
+				}
 				// Sort property keys
 				var keys []string
 				for k := range ch.Properties {
@@ -440,21 +441,33 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 				for _, k := range keys {
 					v := ch.Properties[k]
 					if k == "bot_token" || k == "smtp_pass" || k == "smtp_user" || k == "smtp_from" {
-						_, _ = w.Write([]byte(k + "=***; "))
+						if _, err := w.Write([]byte(k + "=***; ")); err != nil {
+							log.Printf("Write error: %v", err)
+						}
 					} else {
-						_, _ = w.Write([]byte(k + "=" + v + "; "))
+						if _, err := w.Write([]byte(k + "=" + v + "; ")); err != nil {
+							log.Printf("Write error: %v", err)
+						}
 					}
 				}
-				_, _ = w.Write([]byte("</code>"))
+				if _, err := w.Write([]byte("</code>")); err != nil {
+					log.Printf("Write error: %v", err)
+				}
 			}
-			_, _ = w.Write([]byte("</li>"))
+			if _, err := w.Write([]byte("</li>")); err != nil {
+				log.Printf("Write error: %v", err)
+			}
 		}
-		_, _ = w.Write([]byte(`</ul>`))
+		if _, err := w.Write([]byte(`</ul>`)); err != nil {
+			log.Printf("Write error: %v", err)
+		}
 	})
 
 	mux.HandleFunc(basePath+"/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Printf("Write error: %v", err)
+		}
 	})
 
 	mux.HandleFunc(basePath+"/web/config", func(w http.ResponseWriter, r *http.Request) {
