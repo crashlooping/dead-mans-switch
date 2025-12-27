@@ -81,6 +81,18 @@ func (d *DB) SetMissing(name string, missing bool) error {
 	})
 }
 
+// Delete removes a client heartbeat entry from the database.
+// Returns nil if the bucket does not exist or the key is absent.
+func (d *DB) Delete(name string) error {
+	return d.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte("heartbeats"))
+		if b == nil {
+			return nil
+		}
+		return b.Delete([]byte(name))
+	})
+}
+
 func (d *DB) Close() error {
 	return d.db.Close()
 }

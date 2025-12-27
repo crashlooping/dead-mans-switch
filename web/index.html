@@ -82,6 +82,13 @@
         font-weight: bold;
         outline: none;
     }
+        /* Device name is clickable to delete; remove inline delete button styles */
+        .device-name { cursor: pointer; text-decoration: none; }
+        .icon-trash { vertical-align: middle; width:16px; height:16px; display:inline-block; }
+        /* screen-reader only */
+        .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    /* delete toggle removed; delete shown per-row on device name click */
     #tab-content {
         background: #f8fafc;
         border-radius: 0 0 0.5em 0.5em;
@@ -227,6 +234,7 @@
         evtSource.onmessage = function(e) {
             document.getElementById('device-table').innerHTML = e.data;
             convertTimestamps();
+            resolveDataSrcImages(basePath);
         };
         function convertTimestamps() {
             document.querySelectorAll('#device-table td[data-utc]').forEach(function(cell) {
@@ -240,6 +248,14 @@
                         cell.textContent = formatted;
                     }
                 }
+            });
+        }
+        function resolveDataSrcImages(base) {
+            document.querySelectorAll('#device-table img[data-src]').forEach(function(img) {
+                const ds = img.getAttribute('data-src');
+                if (!ds) return;
+                const src = (base && base !== '/') ? base + ds : ds;
+                img.setAttribute('src', src);
             });
         }
         convertTimestamps();
@@ -350,6 +366,48 @@
         // Update build info
         const infoEl = document.getElementById('build-info');
         infoEl.textContent = `Built: ${buildTime} | Commit: ${gitCommit}`;
+
+        // Resolve any images with data-src (e.g., trash icon)
+        document.querySelectorAll('img[data-src]').forEach(function(img) {
+            const ds = img.getAttribute('data-src');
+            if (!ds) return;
+            const src = (basePath && basePath !== '/') ? basePath + ds : ds;
+            img.setAttribute('src', src);
+        });
+
+        // When the device name is clicked, show a confirm dialog and delete the device
+        document.addEventListener('click', function(e) {
+            const nameEl = e.target.closest && e.target.closest('.device-name');
+            if (!nameEl) return;
+            const row = nameEl.closest('tr');
+            if (!row) return;
+            const name = nameEl.textContent && nameEl.textContent.trim();
+            if (!name) return;
+            const url = (basePath || '') + '/heartbeats/' + encodeURIComponent(name);
+            // Confirm before deleting
+            if (!confirm('Delete device "' + name + '"? This action cannot be undone.')) {
+                return;
+            }
+            // Optimistically remove the row so UI updates quickly; server SSE will correct state
+            try {
+                if (row && row.parentNode) row.parentNode.removeChild(row);
+            } catch (err) {
+                // ignore
+            }
+            fetch(url, { method: 'DELETE' })
+                .then(resp => {
+                    if (!resp.ok) {
+                        return resp.text().then(t => Promise.reject(new Error(t || resp.statusText)));
+                    }
+                })
+                .catch(err => {
+                    console.error('Delete failed', err);
+                    alert('Failed to delete device: ' + err.message);
+                    // refresh table to restore removed row
+                    const devUrl = (basePath && basePath !== '/') ? basePath + '/web/devices' : '/web/devices';
+                    fetch(devUrl).then(r => r.text()).then(html => { document.getElementById('device-table').innerHTML = html; }).catch(() => {});
+                });
+        });
     })();
     </script>
 </body>

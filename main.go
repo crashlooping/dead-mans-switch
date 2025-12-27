@@ -119,9 +119,16 @@ func generateDeviceTable(cfg *config.Config, heartbeats map[string]db.ClientHear
 		ch := heartbeats[name]
 		escapedName := html.EscapeString(name)
 
-		htmlBuilder.WriteString("<tr><td>")
+		// Start row and device name cell
+		htmlBuilder.WriteString("<tr>")
+		htmlBuilder.WriteString("<td>")
+		htmlBuilder.WriteString("<span class='device-name'>")
 		htmlBuilder.WriteString(escapedName)
-		htmlBuilder.WriteString(`</td><td data-utc='`)
+		htmlBuilder.WriteString("</span>")
+		htmlBuilder.WriteString("</td>")
+
+		// Last seen cell
+		htmlBuilder.WriteString(`<td data-utc='`)
 		htmlBuilder.WriteString(ch.Timestamp.UTC().Format(time.RFC3339))
 		htmlBuilder.WriteString(`'>`)
 		htmlBuilder.WriteString(ch.Timestamp.UTC().Format(time.RFC3339))
@@ -131,37 +138,32 @@ func generateDeviceTable(cfg *config.Config, heartbeats map[string]db.ClientHear
 		var displayValue, statusClass, iconTitle, svgIcon string
 
 		if cfg.Invert {
-			// Inverted logic: Available column
 			if ch.Missing {
-				// Device is missing = not available
 				displayValue = "no"
-				statusClass = "status-yes" // Red styling (bad state)
+				statusClass = "status-yes"
 				iconTitle = "Not Available"
 				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
 			} else {
-				// Device is not missing = available
 				displayValue = "yes"
-				statusClass = "status-no" // Green styling (good state)
+				statusClass = "status-no"
 				iconTitle = "Available"
 				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
 			}
 		} else {
-			// Normal logic: Missing column
 			if ch.Missing {
-				// Device is missing
 				displayValue = "yes"
-				statusClass = "status-yes" // Red styling (bad state)
+				statusClass = "status-yes"
 				iconTitle = "Missing"
 				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#e53e3e' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'/></svg>`
 			} else {
-				// Device is not missing
 				displayValue = "no"
-				statusClass = "status-no" // Green styling (good state)
+				statusClass = "status-no"
 				iconTitle = "OK"
 				svgIcon = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='#38a169' width='22' height='22'><path stroke-linecap='round' stroke-linejoin='round' d='M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z'/></svg>`
 			}
 		}
 
+		// Status cell
 		htmlBuilder.WriteString(`<td class='`)
 		htmlBuilder.WriteString(statusClass)
 		htmlBuilder.WriteString(`'><span class='status-icon' aria-label='`)
@@ -172,7 +174,12 @@ func generateDeviceTable(cfg *config.Config, heartbeats map[string]db.ClientHear
 		htmlBuilder.WriteString(svgIcon)
 		htmlBuilder.WriteString(`</span> <span class='status-text'>`)
 		htmlBuilder.WriteString(displayValue)
-		htmlBuilder.WriteString(`</span></td></tr>`)
+		htmlBuilder.WriteString(`</span></td>`)
+
+		// No inline delete control; clicking device name triggers delete dialog client-side
+
+		// End row
+		htmlBuilder.WriteString("</tr>")
 	}
 
 	htmlBuilder.WriteString("</tbody></table>")
@@ -385,6 +392,37 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(heartbeats); err != nil {
 			log.Printf("Encode error: %v", err)
+		}
+	})
+
+	// DELETE /heartbeats/{name} - remove a device from the DB
+	mux.HandleFunc(basePath+"/heartbeats/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		// Expect the device name as the path suffix
+		name := strings.TrimPrefix(r.URL.Path, basePath+"/heartbeats/")
+		if name == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			if _, err := w.Write([]byte("Missing device name")); err != nil {
+				log.Printf("Write error: %v", err)
+			}
+			return
+		}
+		if err := dbInstance.Delete(name); err != nil {
+			log.Printf("DB delete error for %s: %v", name, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			if _, err := w.Write([]byte("DB error")); err != nil {
+				log.Printf("Write error: %v", err)
+			}
+			return
+		}
+		// Notify SSE clients of the updated table
+		broadcastDeviceTable(cfg)
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("OK")); err != nil {
+			log.Printf("Write error: %v", err)
 		}
 	})
 
