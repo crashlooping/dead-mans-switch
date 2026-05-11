@@ -117,6 +117,6 @@ jobs:
           cp dead-mans-switch-linux-arm ./build-artifacts/ || true
           cp dead-mans-switch-windows-amd64.exe ./build-artifacts/ || true
       - name: Upload binaries to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ./build-artifacts/**/*
