@@ -484,7 +484,12 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		maskedCfg := *cfg
 		maskedCfg.NotificationChannels = config.MaskChannelSecrets(cfg.NotificationChannels)
-		_ = json.NewEncoder(w).Encode(maskedCfg)
+		pretty, err := json.MarshalIndent(maskedCfg, "", "  ")
+		if err != nil {
+			http.Error(w, "failed to encode config", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(pretty)
 	})
 
 	// Serve static files under /web if needed (e.g. /web/htmx.js)
