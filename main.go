@@ -413,8 +413,11 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			}
 			return
 		}
-		// Insert data attributes
-		htmlContent := strings.Replace(string(index), "<body>", fmt.Sprintf("<body data-base-path='%s' data-build-time='%s' data-git-commit='%s'>", basePath, BuildTime, GitCommit), 1)
+		// Inject <base> tag for correct relative URL resolution (vendor/, favicon, etc.)
+		webBase := basePath + "/web/"
+		htmlContent := strings.Replace(string(index), "<head>", "<head>\n    <base href='"+webBase+"'>", 1)
+		// Inject data attributes into <body>
+		htmlContent = strings.Replace(htmlContent, "<body>", fmt.Sprintf("<body data-base-path='%s' data-build-time='%s' data-git-commit='%s'>", basePath, BuildTime, GitCommit), 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if _, err := w.Write([]byte(htmlContent)); err != nil {
 			log.Printf("Write error: %v", err)

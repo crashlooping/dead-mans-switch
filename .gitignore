@@ -24,8 +24,8 @@ Thumbs.db
 # Test output
 *.log
 
-# Go modules
-vendor/
+# Go modules (vendor/ for Go packages, not web/vendor/)
+/vendor/
 
 # Database
 /data/*
