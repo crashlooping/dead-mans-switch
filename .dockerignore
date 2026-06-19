@@ -1,27 +1,30 @@
 # Ignore everything by default
 *
 
-# But not these files...
+# Allow only what's needed for the build
 !go.mod
 !go.sum
 !main.go
 !config/
 !notify/
 !db/
-!Dockerfile
 !web/
 
-# Ignore test files and build/test output
+# Ignore build artifacts, tests, CI, and dev files
+.git/
+.github/
+.vscode/
+/build/
+/bin/
 *.test
 *.exe
 *.out
 *.log
-/build/
-/bin/
-/test.db
-/test-heartbeats.db
-.vscode/
-.git/
-.gitignore
-README.md
+*.db
+*.http
+*.sample
 *.md
+screenshot-*.png
+lefthook.yml
+config.yaml
+config.yaml.sample

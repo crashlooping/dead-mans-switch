@@ -13,7 +13,7 @@ type TelegramNotifier struct {
 }
 
 func (t *TelegramNotifier) Notify(subject, message string) error {
-	return t.n.Send(context.TODO(), subject, message)
+	return t.n.Send(context.Background(), subject, message)
 }
 
 func NewTelegramNotifier(props map[string]string) Notifier {

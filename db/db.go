@@ -58,6 +58,31 @@ func (d *DB) GetAllHeartbeats() (map[string]ClientHeartbeat, error) {
 	return heartbeats, err
 }
 
+// Get retrieves a single client heartbeat by name.
+// Returns the heartbeat and true if found, or a zero value and false if not.
+func (d *DB) Get(name string) (ClientHeartbeat, bool) {
+	var ch ClientHeartbeat
+	err := d.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte("heartbeats"))
+		if b == nil {
+			return nil
+		}
+		v := b.Get([]byte(name))
+		if v == nil {
+			return nil
+		}
+		return json.Unmarshal(v, &ch)
+	})
+	if err != nil {
+		return ch, false
+	}
+	// If we got a zero-name heartbeat, it wasn't found
+	if ch.Name == "" {
+		return ch, false
+	}
+	return ch, true
+}
+
 func (d *DB) SetMissing(name string, missing bool) error {
 	return d.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte("heartbeats"))

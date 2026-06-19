@@ -20,14 +20,21 @@ import (
 )
 
 var (
-	dbInstance  *db.DB
-	clientState = make(map[string]bool) // true = missing, false = ok
-	sseClients  = make(map[chan string]struct{})
-	sseMu       sync.Mutex
+	dbInstance *db.DB
+	sseClients = make(map[chan string]struct{})
+	sseMu      sync.Mutex
 )
 
 var BuildTime = "dev"
 var GitCommit = "none"
+
+// Default filesystem paths used by the server.
+const (
+	defaultConfigPath = "config.yaml"
+	defaultDataDir    = "data"
+	defaultDBFileName = "heartbeats.db"
+	defaultIndexHTML  = "web/index.html"
+)
 
 func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 	// Wait until the next minute boundary (0 seconds)
@@ -64,21 +71,6 @@ func monitor(cfg *config.Config, notifiers []notify.Notifier) {
 					log.Printf("SetMissing error: %v", err)
 				}
 				broadcastDeviceTable(cfg) // update SSE clients on timeout
-			} else if !missed && ch.Missing {
-				msg := cfg.NotificationMessages.Recovery
-				if msg == "" {
-					msg = "Heartbeat received again from client: {{name}}"
-				}
-				msg = strings.ReplaceAll(msg, "{{name}}", name)
-				for _, n := range notifiers {
-					if err := n.Notify("Dead Man's Switch Recovery", msg); err != nil {
-						log.Printf("Notify error: %v", err)
-					}
-				}
-				if err := dbInstance.SetMissing(name, false); err != nil {
-					log.Printf("SetMissing error: %v", err)
-				}
-				broadcastDeviceTable(cfg) // update SSE clients on recovery
 			}
 		}
 	}
@@ -206,7 +198,7 @@ func broadcastDeviceTable(cfg *config.Config) {
 }
 
 func main() {
-	cfg, err := config.LoadConfig("config.yaml")
+	cfg, err := config.LoadConfig(defaultConfigPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -217,27 +209,7 @@ func main() {
 	}
 
 	// Create a masked copy of notification channels for logging
-	maskedChannels := make([]config.NotificationChannel, len(cfg.NotificationChannels))
-	for i, ch := range cfg.NotificationChannels {
-		maskedChannels[i] = config.NotificationChannel{
-			Type:       ch.Type,
-			Properties: make(map[string]string),
-		}
-		for k, v := range ch.Properties {
-			switch k {
-			case "bot_token":
-				if len(v) > 6 {
-					maskedChannels[i].Properties[k] = v[:3] + "***" + v[len(v)-3:]
-				} else {
-					maskedChannels[i].Properties[k] = "***"
-				}
-			case "smtp_pass":
-				maskedChannels[i].Properties[k] = "***"
-			default:
-				maskedChannels[i].Properties[k] = v
-			}
-		}
-	}
+	maskedChannels := config.MaskChannelSecrets(cfg.NotificationChannels)
 
 	log.Printf("Config loaded: listen_addr=%s, timeout_seconds=%d, notification_channels=%v", cfg.ListenAddr, cfg.TimeoutSeconds, maskedChannels)
 
@@ -253,11 +225,11 @@ func main() {
 	// Log build metadata
 	log.Printf("Build Time: %s, Git Commit: %s", BuildTime, GitCommit)
 
-	dbPath := "data/heartbeats.db"
+	dbPath := defaultDataDir + "/" + defaultDBFileName
 	if os.Getenv("HEARTBEAT_DB_PATH") != "" {
 		dbPath = os.Getenv("HEARTBEAT_DB_PATH")
 	}
-	if err := os.MkdirAll("data", 0755); err != nil {
+	if err := os.MkdirAll(defaultDataDir, 0755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 	dbInstance, err = db.Open(dbPath)
@@ -275,6 +247,18 @@ func main() {
 }
 
 func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
+	// Apply security header defaults for unset values
+	sh := cfg.SecurityHeaders
+	if sh.XContentTypeOptions == "" {
+		sh.XContentTypeOptions = "nosniff"
+	}
+	if sh.XFrameOptions == "" {
+		sh.XFrameOptions = "DENY"
+	}
+	if sh.ReferrerPolicy == "" {
+		sh.ReferrerPolicy = "strict-origin-when-cross-origin"
+	}
+	cfg.SecurityHeaders = sh
 	basePath := os.Getenv("BASE_PATH") // e.g. "/dead-mans-switch"
 	if basePath == "/" {
 		basePath = ""
@@ -341,12 +325,8 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		log.Printf("Received heartbeat from client: %s", body.Name)
 		now := time.Now()
 		// Check if client was missing before updating
-		heartbeats, err := dbInstance.GetAllHeartbeats()
-		if err != nil {
-			log.Printf("DB error getting heartbeats: %v", err)
-		}
 		wasMissing := false
-		if ch, ok := heartbeats[body.Name]; ok {
+		if ch, ok := dbInstance.Get(body.Name); ok {
 			wasMissing = ch.Missing
 		}
 		err = dbInstance.UpdateHeartbeat(body.Name, now, false)
@@ -357,20 +337,17 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 			broadcastDeviceTable(cfg)
 		}
 		if wasMissing {
-			msg := "Heartbeat received again from client: " + body.Name
+			msg := cfg.NotificationMessages.Recovery
+			if msg == "" {
+				msg = "Heartbeat received again from client: {{name}}"
+			}
+			msg = strings.ReplaceAll(msg, "{{name}}", body.Name)
 			for _, n := range notifiers {
 				if err := n.Notify("Dead Man's Switch Recovery", msg); err != nil {
 					log.Printf("Notify error: %v", err)
 				}
 			}
-			if err := dbInstance.SetMissing(body.Name, false); err != nil {
-				log.Printf("SetMissing error: %v", err)
-			}
 		}
-		// Mark as healthy with proper synchronization
-		sseMu.Lock()
-		clientState[body.Name] = false
-		sseMu.Unlock()
 
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("OK")); err != nil {
@@ -428,7 +405,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 
 	mux.HandleFunc(basePath+"/web", func(w http.ResponseWriter, r *http.Request) {
 		// Inject basePath, build metadata into the HTML as data attributes on <body>
-		index, err := os.ReadFile("web/index.html")
+		index, err := os.ReadFile(defaultIndexHTML)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			if _, err := w.Write([]byte("index.html not found")); err != nil {
@@ -456,13 +433,12 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		if _, err := w.Write([]byte(`<ul>`)); err != nil {
 			log.Printf("Write error: %v", err)
 		}
-		// Sort notification channels by type
-		notifs := make([]config.NotificationChannel, len(cfg.NotificationChannels))
-		copy(notifs, cfg.NotificationChannels)
-		sort.Slice(notifs, func(i, j int) bool {
-			return notifs[i].Type < notifs[j].Type
+		// Sort notification channels by type (with secrets masked)
+		maskedNotifs := config.MaskChannelSecrets(cfg.NotificationChannels)
+		sort.Slice(maskedNotifs, func(i, j int) bool {
+			return maskedNotifs[i].Type < maskedNotifs[j].Type
 		})
-		for _, ch := range notifs {
+		for _, ch := range maskedNotifs {
 			if _, err := w.Write([]byte("<li><b>" + ch.Type + "</b>")); err != nil {
 				log.Printf("Write error: %v", err)
 			}
@@ -477,15 +453,8 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					v := ch.Properties[k]
-					if k == "bot_token" || k == "smtp_pass" || k == "smtp_user" || k == "smtp_from" {
-						if _, err := w.Write([]byte(k + "=***; ")); err != nil {
-							log.Printf("Write error: %v", err)
-						}
-					} else {
-						if _, err := w.Write([]byte(k + "=" + v + "; ")); err != nil {
-							log.Printf("Write error: %v", err)
-						}
+					if _, err := w.Write([]byte(k + "=" + ch.Properties[k] + "; ")); err != nil {
+						log.Printf("Write error: %v", err)
 					}
 				}
 				if _, err := w.Write([]byte("</code>")); err != nil {
@@ -509,60 +478,10 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 	})
 
 	mux.HandleFunc(basePath+"/web/config", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		// Try to read config.yaml and mask secrets
-		content, err := os.ReadFile("config.yaml")
-		if err == nil {
-			lines := strings.Split(string(content), "\n")
-			for i, line := range lines {
-				if strings.Contains(line, "bot_token:") {
-					parts := strings.SplitN(line, ":", 2)
-					if len(parts) == 2 {
-						value := strings.TrimSpace(parts[1])
-						// Check if value is quoted and extract the actual token
-						if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) && len(value) > 2 {
-							token := value[1 : len(value)-1] // Remove quotes
-							if len(token) > 6 {
-								lines[i] = parts[0] + `: "` + token[:3] + "***" + token[len(token)-3:] + `"`
-							} else {
-								lines[i] = parts[0] + `: "***"`
-							}
-						} else if len(value) > 6 {
-							lines[i] = parts[0] + ": " + value[:3] + "***" + value[len(value)-3:]
-						} else {
-							lines[i] = parts[0] + ": ***"
-						}
-					}
-				} else if strings.Contains(line, "pass:") || strings.Contains(line, "token:") {
-					parts := strings.SplitN(line, ":", 2)
-					if len(parts) == 2 {
-						lines[i] = parts[0] + ": ***"
-					}
-				}
-			}
-			masked := strings.Join(lines, "\n")
-			if _, err := w.Write([]byte(masked)); err != nil {
-				log.Printf("error writing masked config: %v", err)
-			}
-			return
-		}
-		// fallback: show as JSON with masked secrets
-		masked := cfg
-		for i := range masked.NotificationChannels {
-			for k, v := range masked.NotificationChannels[i].Properties {
-				if k == "bot_token" {
-					if len(v) > 6 {
-						masked.NotificationChannels[i].Properties[k] = v[:3] + "***" + v[len(v)-3:]
-					} else {
-						masked.NotificationChannels[i].Properties[k] = "***"
-					}
-				} else if strings.Contains(k, "pass") || strings.Contains(k, "token") || strings.Contains(k, "secret") {
-					masked.NotificationChannels[i].Properties[k] = "***"
-				}
-			}
-		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_ = json.NewEncoder(w).Encode(masked)
+		maskedCfg := *cfg
+		maskedCfg.NotificationChannels = config.MaskChannelSecrets(cfg.NotificationChannels)
+		_ = json.NewEncoder(w).Encode(maskedCfg)
 	})
 
 	// Serve static files under /web if needed (e.g. /web/htmx.js)
@@ -578,7 +497,7 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		_, _ = w.Write([]byte("Not found"))
 	})
 
-	server := &http.Server{Addr: cfg.ListenAddr, Handler: mux}
+	server := &http.Server{Addr: cfg.ListenAddr, Handler: securityHeaders(cfg, mux)}
 	go func() {
 		log.Printf("Starting server on %s (basePath: %s)", cfg.ListenAddr, basePath)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -593,6 +512,22 @@ func runServer(cfg *config.Config, notifiers []notify.Notifier) int {
 		log.Printf("server close error: %v", err)
 	}
 	return 0
+}
+
+// securityHeaders returns middleware that sets configurable security headers.
+func securityHeaders(cfg *config.Config, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v := cfg.SecurityHeaders.XContentTypeOptions; v != "off" {
+			w.Header().Set("X-Content-Type-Options", v)
+		}
+		if v := cfg.SecurityHeaders.XFrameOptions; v != "off" {
+			w.Header().Set("X-Frame-Options", v)
+		}
+		if v := cfg.SecurityHeaders.ReferrerPolicy; v != "off" {
+			w.Header().Set("Referrer-Policy", v)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func formatDuration(d time.Duration) string {

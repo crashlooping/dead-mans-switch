@@ -1,25 +1,22 @@
 package db
 
 import (
-	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
+func testDBPath(t *testing.T, name string) string {
+	t.Helper()
+	return filepath.Join(t.TempDir(), name)
+}
+
 func TestHeartbeatAndMissingState(t *testing.T) {
-	os.Remove("test.db")
-	db, err := Open("test.db")
+	db, err := Open(testDBPath(t, "test.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Errorf("db.Close() error: %v", err)
-		}
-		if err := os.Remove("test.db"); err != nil && !os.IsNotExist(err) {
-			t.Fatalf("os.Remove error: %v", err)
-		}
-	}()
+	defer db.Close()
 
 	name := "client1"
 	now := time.Now().Truncate(time.Second)
@@ -53,15 +50,11 @@ func TestHeartbeatAndMissingState(t *testing.T) {
 }
 
 func TestMultipleHeartbeats(t *testing.T) {
-	os.Remove("test_multi.db")
-	db, err := Open("test_multi.db")
+	db, err := Open(testDBPath(t, "test_multi.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer func() {
-		db.Close()
-		os.Remove("test_multi.db")
-	}()
+	defer db.Close()
 
 	now := time.Now()
 	names := []string{"client1", "client2", "client3"}
@@ -86,15 +79,11 @@ func TestMultipleHeartbeats(t *testing.T) {
 }
 
 func TestUpdateHeartbeatOverwrite(t *testing.T) {
-	os.Remove("test_overwrite.db")
-	db, err := Open("test_overwrite.db")
+	db, err := Open(testDBPath(t, "test_overwrite.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer func() {
-		db.Close()
-		os.Remove("test_overwrite.db")
-	}()
+	defer db.Close()
 
 	name := "client1"
 	time1 := time.Now()
@@ -120,16 +109,43 @@ func TestUpdateHeartbeatOverwrite(t *testing.T) {
 	}
 }
 
-func TestSetMissingNonexistent(t *testing.T) {
-	os.Remove("test_nonexist.db")
-	db, err := Open("test_nonexist.db")
+func TestGetHeartbeat(t *testing.T) {
+	db, err := Open(testDBPath(t, "test_get.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer func() {
-		db.Close()
-		os.Remove("test_nonexist.db")
-	}()
+	defer db.Close()
+
+	name := "client1"
+	now := time.Now().Truncate(time.Second)
+	if err := db.UpdateHeartbeat(name, now, false); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	ch, ok := db.Get(name)
+	if !ok {
+		t.Fatal("Get returned not-found for existing entry")
+	}
+	if ch.Name != name || !ch.Timestamp.Equal(now) || ch.Missing {
+		t.Errorf("unexpected heartbeat: %+v", ch)
+	}
+
+	// Non-existent
+	ch, ok = db.Get("nonexistent")
+	if ok {
+		t.Error("expected not-found for nonexistent entry")
+	}
+	if ch.Name != "" {
+		t.Errorf("expected zero value, got %+v", ch)
+	}
+}
+
+func TestSetMissingNonexistent(t *testing.T) {
+	db, err := Open(testDBPath(t, "test_nonexist.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
 
 	// SetMissing on non-existent entry should not error
 	err = db.SetMissing("nonexistent", true)
@@ -139,15 +155,11 @@ func TestSetMissingNonexistent(t *testing.T) {
 }
 
 func TestGetAllHeartbeatsEmpty(t *testing.T) {
-	os.Remove("test_empty.db")
-	db, err := Open("test_empty.db")
+	db, err := Open(testDBPath(t, "test_empty.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer func() {
-		db.Close()
-		os.Remove("test_empty.db")
-	}()
+	defer db.Close()
 
 	beats, err := db.GetAllHeartbeats()
 	if err != nil {
@@ -155,5 +167,39 @@ func TestGetAllHeartbeatsEmpty(t *testing.T) {
 	}
 	if len(beats) != 0 {
 		t.Errorf("expected 0 heartbeats, got %d", len(beats))
+	}
+}
+
+func TestDelete(t *testing.T) {
+	db, err := Open(testDBPath(t, "test_delete.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	// Insert two entries
+	if err := db.UpdateHeartbeat("alpha", time.Now(), false); err != nil {
+		t.Fatalf("update alpha: %v", err)
+	}
+	if err := db.UpdateHeartbeat("beta", time.Now(), false); err != nil {
+		t.Fatalf("update beta: %v", err)
+	}
+
+	// Delete alpha
+	if err := db.Delete("alpha"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	beats, _ := db.GetAllHeartbeats()
+	if _, ok := beats["alpha"]; ok {
+		t.Error("alpha should have been deleted")
+	}
+	if _, ok := beats["beta"]; !ok {
+		t.Error("beta should still exist")
+	}
+
+	// Delete non-existent key should not error
+	if err := db.Delete("nonexistent"); err != nil {
+		t.Errorf("Delete nonexistent returned error: %v", err)
 	}
 }
